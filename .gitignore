@@ -4,3 +4,4 @@ node_modules/
 *.log
 dist/
 openspec/changes/**/spec-viewer.html
+.openspec/.backups/

@@ -41,6 +41,13 @@ No new slash commands are introduced. Your existing workflows continue using the
 | **`/opsx:apply`** | Executes implementation | + Validates all feedback & remarks from `spec-viewer.html` are resolved before code changes<br>+ Sequential task execution with real-time progress tracking |
 | **`/opsx:sync`** | Merges delta specs | + Intelligent requirement merging into `openspec/specs/` |
 | **`/opsx:archive`** | Moves change to archive | + Safely commits delivered artifacts with attributable Git pathspecs |
+| **`/opsx:edit`** | Command customizer & presets | + Natural language intent routing across all multi-agent files<br>+ **Zero-AI Deterministic Backup**: Immutable snapshots with SHA-256 integrity<br>+ Instant rollback (`--latest`) & guaranteed package factory reset (`--factory-reset`)<br>+ **Presets Ecosystem**: Save, export, import, and bootstrap projects with custom presets |
+
+---
+
+## 📖 Detailed Guides
+
+* 📘 [Command Customization, Presets & Disaster Recovery Guide](docs/command-customization-guide.md)
 
 ---
 
@@ -50,7 +57,7 @@ OpenSpec-Ex supports all major AI coding assistants and IDEs:
 
 | AI Assistant / IDE | Skills / Rule Directory |
 | :--- | :--- |
-| **Google Antigravity / Gemini** | `.agents/skills/` & `.agents/rules/` |
+| **Google Antigravity / Gemini** | `.agent/skills/`, `.agent/workflows/` & `.agent/rules/` |
 | **Cursor** | `.cursor/rules/*.mdc` & `.cursorrules` |
 | **Claude Code** | `.claude/skills/` & `CLAUDE.md` |
 | **Windsurf / Cascade** | `.windsurf/skills/` & `.windsurfrules` |
@@ -67,9 +74,24 @@ OpenSpec-Ex supports all major AI coding assistants and IDEs:
 # Setup / update OpenSpec skills in current project
 npx openspec-ex init
 
-# Non-interactive setup for specific agent
-npx openspec-ex init --agent cursor
-npx openspec-ex init --agent antigravity
+# Initialize workspace directly from a preset
+npx openspec-ex init --preset fintech-strict --agent all
+
+# Snapshot management with SHA-256 integrity
+npx openspec-ex backup create --reason "pre-security-audit"
+npx openspec-ex backup list
+
+# Deterministic rollback (Zero AI)
+npx openspec-ex restore --latest
+npx openspec-ex restore --id <snapshot-id>
+npx openspec-ex restore --factory-reset
+
+# Presets management
+npx openspec-ex preset save my-preset --global
+npx openspec-ex preset apply my-preset
+npx openspec-ex preset list
+npx openspec-ex preset export my-preset bundle.json
+npx openspec-ex preset import bundle.json --global
 
 # Optional CLI helper to rebuild spec-viewer.html
 npx openspec-ex view [change-path]
