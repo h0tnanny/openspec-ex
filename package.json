@@ -13,6 +13,14 @@
     "claude-code",
     "windsurf"
   ],
+  "homepage": "https://github.com/h0tnanny/openspec-ex#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/h0tnanny/openspec-ex.git"
+  },
+  "bugs": {
+    "url": "https://github.com/h0tnanny/openspec-ex/issues"
+  },
   "author": "OpenSpec Contributors",
   "license": "MIT",
   "main": "src/generator.js",
