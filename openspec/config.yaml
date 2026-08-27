@@ -1,0 +1,18 @@
+# OpenSpec Project Configuration
+schema: spec-driven
+
+# Context shared with all AI coding assistants during spec workflows
+context: |
+  # Project Context & Standards
+  # Add tech stack, coding conventions, architecture principles, and constraints here.
+
+# Rules applied to specific artifacts
+rules:
+  explore: |
+    - Always preserve the verbatim initial prompt in explore.md
+    - Conduct a proactive Q&A interview before freezing SSOT
+  proposal: |
+    - Rely strictly on explore.md as the Single Source of Truth (SSOT)
+    - Perform a gap-analysis self-audit to prevent loss of intent
+  tasks: |
+    - Include a Traceability Matrix linking tasks to SSOT goals

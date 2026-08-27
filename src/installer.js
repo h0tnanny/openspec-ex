@@ -1,7 +1,7 @@
 /**
  * OpenSpec-Ex Installer Module
- * Full parity with OpenSpec AI agent detection, skill generation, and rules installation.
- * Supports single agent, multi-select, and universal deployment.
+ * Full 1:1 parity with authentic OpenSpec setup and workflow architecture.
+ * Updates the 5 core OpenSpec skills without introducing any new commands.
  */
 
 const fs = require('fs');
@@ -34,14 +34,47 @@ function detectActiveAgents(projectRoot) {
   return detected;
 }
 
+// Strictly the 5 authentic OpenSpec skills
 const SKILL_NAMES = [
   'openspec-explore',
   'openspec-propose',
   'openspec-apply-change',
   'openspec-archive-change',
-  'openspec-sync-specs',
-  'openspec-view'
+  'openspec-sync-specs'
 ];
+
+function initOpenSpecScaffold(projectRoot) {
+  const scaffoldDirs = [
+    path.join(projectRoot, 'openspec', 'changes'),
+    path.join(projectRoot, 'openspec', 'specs'),
+    path.join(projectRoot, 'openspec', 'templates')
+  ];
+  scaffoldDirs.forEach(dir => ensureDirSync(dir));
+
+  const configPath = path.join(projectRoot, 'openspec', 'config.yaml');
+  if (!fs.existsSync(configPath)) {
+    const configYamlContent = `# OpenSpec Project Configuration
+schema: spec-driven
+
+# Context shared with all AI coding assistants during spec workflows
+context: |
+  # Project Context & Standards
+  # Add tech stack, coding conventions, architecture principles, and constraints here.
+
+# Rules applied to specific artifacts
+rules:
+  explore: |
+    - Always preserve the verbatim initial prompt in explore.md
+    - Conduct a proactive Q&A interview before freezing SSOT
+  proposal: |
+    - Rely strictly on explore.md as the Single Source of Truth (SSOT)
+    - Perform a gap-analysis self-audit to prevent loss of intent
+  tasks: |
+    - Include a Traceability Matrix linking tasks to SSOT goals
+`;
+    fs.writeFileSync(configPath, configYamlContent, 'utf8');
+  }
+}
 
 function installSkillsForAgent(agent, projectRoot, packageRoot) {
   const installed = [];
@@ -124,26 +157,23 @@ function installForAgent(agentKey, projectRoot, packageRoot) {
   }
 
   const templateFiles = ['explore.md', 'proposal.md', 'design.md', 'tasks.md'];
-  const targetTemplateDir = path.join(projectRoot, agent.templateDir || '.openspec/templates');
+  const targetTemplateDirs = [
+    path.join(projectRoot, agent.templateDir || '.openspec/templates'),
+    path.join(projectRoot, 'openspec', 'templates')
+  ];
 
   templateFiles.forEach(tf => {
     const srcTf = path.join(packageRoot, 'templates', tf);
-    const destTf = path.join(targetTemplateDir, tf);
-    if (fs.existsSync(srcTf)) {
-      copyFileSync(srcTf, destTf);
-      installedFiles.push(path.relative(projectRoot, destTf));
-    }
+    targetTemplateDirs.forEach(td => {
+      const destTf = path.join(td, tf);
+      if (fs.existsSync(srcTf)) {
+        copyFileSync(srcTf, destTf);
+        installedFiles.push(path.relative(projectRoot, destTf));
+      }
+    });
   });
 
   return installedFiles;
-}
-
-function initOpenSpecScaffold(projectRoot, packageRoot) {
-  const scaffoldDirs = [
-    path.join(projectRoot, 'openspec', 'changes'),
-    path.join(projectRoot, 'openspec', 'specs')
-  ];
-  scaffoldDirs.forEach(dir => ensureDirSync(dir));
 }
 
 function updateProjectPackageJson(projectRoot) {
@@ -172,8 +202,8 @@ async function runInteractiveInstaller(options = {}) {
   const projectRoot = options.cwd || process.cwd();
   const packageRoot = path.resolve(__dirname, '..');
 
-  console.log('\n\x1b[1m\x1b[36m▲ OpenSpec-Ex — Native Slash Commands & Agent Skills Setup\x1b[0m');
-  console.log('\x1b[90mRegisters 100% authentic OpenSpec commands with SSOT Explore, Self-Audit Review & Interactive Viewer\x1b[0m\n');
+  console.log('\n\x1b[1m\x1b[36m▲ OpenSpec-Ex — Unified Spec-Driven Development Setup\x1b[0m');
+  console.log('\x1b[90mUpdates core OpenSpec skills (explore, propose, apply, sync, archive) without changing command syntax\x1b[0m\n');
 
   const detectedAgents = detectActiveAgents(projectRoot);
   let selectedAgentKeys = [];
@@ -190,7 +220,7 @@ async function runInteractiveInstaller(options = {}) {
   }
 
   if (selectedAgentKeys.length === 0) {
-    console.log('\x1b[1mSelect AI Coding Assistant(s) to register commands:\x1b[0m\n');
+    console.log('\x1b[1mSelect AI Coding Assistant(s) to configure:\x1b[0m\n');
 
     AI_TOOLS.forEach((tool, idx) => {
       const isDetected = detectedAgents.includes(tool.id) ? ' \x1b[32m[DETECTED IN WORKSPACE]\x1b[0m' : '';
@@ -242,14 +272,17 @@ async function runInteractiveInstaller(options = {}) {
 
   selectedAgentKeys = [...new Set(selectedAgentKeys)];
 
-  console.log(`\n\x1b[36m→ Registering native OpenSpec commands & skills for ${selectedAgentKeys.length} agent(s):\x1b[0m`);
+  console.log(`\n\x1b[36m→ Updating OpenSpec skills for ${selectedAgentKeys.length} agent(s):\x1b[0m`);
   selectedAgentKeys.forEach(k => {
     console.log(`  \x1b[32m✔\x1b[0m \x1b[1m${AGENTS[k].name}\x1b[0m`);
   });
 
-  initOpenSpecScaffold(projectRoot, packageRoot);
+  initOpenSpecScaffold(projectRoot);
 
-  let allInstalledFiles = [];
+  let allInstalledFiles = [
+    path.relative(projectRoot, path.join(projectRoot, 'openspec', 'config.yaml'))
+  ];
+
   selectedAgentKeys.forEach(key => {
     const files = installForAgent(key, projectRoot, packageRoot);
     allInstalledFiles = allInstalledFiles.concat(files);
@@ -264,8 +297,8 @@ async function runInteractiveInstaller(options = {}) {
 
   const pkgUpdated = updateProjectPackageJson(projectRoot);
 
-  console.log('\n\x1b[32m✔ Authentic OpenSpec Skills & Commands registered successfully!\x1b[0m\n');
-  console.log('\x1b[1mRegistered Slash Commands & Files:\x1b[0m');
+  console.log('\n\x1b[32m✔ OpenSpec skills updated successfully!\x1b[0m\n');
+  console.log('\x1b[1mUpdated Core Skills & Config:\x1b[0m');
   [...new Set(allInstalledFiles)].forEach(f => {
     console.log(`  \x1b[90m+\x1b[0m ${f}`);
   });
@@ -274,13 +307,12 @@ async function runInteractiveInstaller(options = {}) {
     console.log('  \x1b[90m+\x1b[0m package.json (added "spec:view" script)');
   }
 
-  console.log('\n\x1b[1m\x1b[36mNative Slash Commands ready in your AI Chat:\x1b[0m');
-  console.log('  👉 \x1b[33m/explore <idea>\x1b[0m         (or /opsx:explore) — Proactive interview & SSOT explore.md');
-  console.log('  👉 \x1b[33m/propose <name>\x1b[0m         (or /opsx:propose) — Strict SSOT proposal + review gap audit');
-  console.log('  👉 \x1b[33m/view <name>\x1b[0m            (or /opsx:view)    — Generate & open interactive HTML report');
-  console.log('  👉 \x1b[33m/apply <name>\x1b[0m           (or /opsx:apply)   — Implement tasks once feedback is resolved');
-  console.log('  👉 \x1b[33m/sync <name>\x1b[0m            (or /opsx:sync)    — Sync delta specs with main specs');
-  console.log('  👉 \x1b[33m/archive <name>\x1b[0m         (or /opsx:archive) — Finalize and move change to archive\n');
+  console.log('\n\x1b[1m\x1b[36mOriginal Commands (Enhanced Internally):\x1b[0m');
+  console.log('  👉 \x1b[33m/opsx:explore <idea>\x1b[0m — Discovery interview & SSOT explore.md');
+  console.log('  👉 \x1b[33m/opsx:propose <name>\x1b[0m — Strict SSOT proposal, review gap audit & HTML viewer');
+  console.log('  👉 \x1b[33m/opsx:apply <name>\x1b[0m   — Implement tasks once feedback is resolved');
+  console.log('  👉 \x1b[33m/opsx:sync <name>\x1b[0m    — Sync delta specs with main specs');
+  console.log('  👉 \x1b[33m/opsx:archive <name>\x1b[0m — Finalize and move change to archive\n');
 }
 
 module.exports = {

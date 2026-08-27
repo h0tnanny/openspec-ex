@@ -1,12 +1,12 @@
 ---
 name: openspec-propose
-description: Propose a new change with all artifacts generated in one step based on explore.md SSOT, run automated gap analysis review, and generate interactive spec-viewer.html.
+description: Propose a new change with all artifacts generated in one step. Use when the user wants to quickly describe what they want to build and get a complete proposal with design, specs, and tasks ready for implementation.
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
-  author: openspec-ex
+  author: openspec
   version: "1.0"
-  generatedBy: "openspec-ex"
+  generatedBy: "1.4.1"
 ---
 
 Propose a new change - create the change and generate all artifacts in one step based on `explore.md` (SSOT).
@@ -16,7 +16,7 @@ I'll create a change with artifacts:
 - `specs/<capability>/spec.md` (what system must do)
 - `design.md` (how)
 - `tasks.md` (implementation steps)
-- `spec-viewer.html` (interactive HTML report)
+- `spec-viewer.html` (interactive HTML review report)
 
 When ready to implement, run `/opsx:apply`
 
@@ -72,11 +72,11 @@ When ready to implement, run `/opsx:apply`
    - Automatically cross-check generated artifacts against `explore.md`.
    - Verify that NO user requirements, constraints, or edge cases from `explore.md` were lost or diluted.
 
-7. **Generate Interactive Spec Viewer**
-   ```bash
-   npx openspec-ex view openspec/changes/<name>
-   ```
-   Compile the standalone HTML report for human-in-the-loop review.
+7. **Generate Interactive Spec Viewer Report**
+   - Compile `spec-viewer.html` for interactive review:
+     ```bash
+     node .agents/scripts/generate-viewer.js openspec/changes/<name>
+     ```
 
 8. **Show final status & Spec Viewer link**
    ```bash
@@ -88,11 +88,11 @@ When ready to implement, run `/opsx:apply`
 After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
-- Link to generated `spec-viewer.html`
+- Link to generated `spec-viewer.html` for interactive human-in-the-loop review
 - Prompt: "Review the specification in `spec-viewer.html` or run `/opsx:apply` to start working on tasks."
 
 **Guardrails**
-- Create ALL artifacts needed for implementation
+- Create ALL artifacts needed for implementation (as defined by schema's `apply.requires`)
 - Base decisions strictly on `explore.md` SSOT
 - Verify each artifact file exists after writing
-- Run `npx openspec-ex view` to produce the interactive HTML report
+- Automatically generate `spec-viewer.html` as part of the propose output
