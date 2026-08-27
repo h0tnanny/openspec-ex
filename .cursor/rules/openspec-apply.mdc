@@ -1,0 +1,21 @@
+---
+name: openspec-apply
+description: Implement tasks from tasks.md after verifying all spec comments and feedback are resolved.
+globs: ["openspec/**", "**/*.md"]
+---
+
+# /opsx:apply (Implementation Mode)
+
+Implement tasks from an OpenSpec change.
+
+## Workflow
+
+1. **Verify Resolved Feedback**:
+   - Ensure all user comments from `spec-viewer.html` have been addressed in `tasks.md` and `design.md`.
+
+2. **Execute Tasks**:
+   - Read `tasks.md` and implement tasks step-by-step.
+   - Update checklist progress: `- [x] Task`.
+
+3. **Verify Compliance**:
+   - Run test suite and verify against acceptance criteria in `explore.md`.

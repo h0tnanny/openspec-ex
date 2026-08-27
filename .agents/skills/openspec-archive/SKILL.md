@@ -1,0 +1,13 @@
+---
+name: openspec-archive
+description: Finalize and archive a completed OpenSpec change, updating main specs.
+---
+
+# /opsx:archive (Archive Completed Change)
+
+Archive a completed change once all tasks in `tasks.md` are implemented and verified.
+
+## Workflow
+
+1. Move delta specs from `openspec/changes/<change-id>/specs/` into main `openspec/specs/`.
+2. Move `openspec/changes/<change-id>/` to `openspec/changes/archive/<date>-<change-id>/`.

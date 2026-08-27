@@ -1,0 +1,31 @@
+---
+name: openspec-propose
+description: Propose a new change based strictly on explore.md SSOT, run automated gap analysis review, and generate interactive spec-viewer.html.
+---
+
+# /opsx:propose (Strict SSOT & Review Gap-Analysis)
+
+Propose a new change based strictly on `explore.md`.
+
+## Workflow
+
+1. **Load Single Source of Truth (`explore.md`)**:
+   - Read `openspec/changes/<change-name>/explore.md`.
+   - If `explore.md` does not exist, run `/opsx:explore` first.
+
+2. **Generate Planning Artifacts**:
+   - `proposal.md` — intent, scope, and direct mapping to SSOT goals.
+   - `specs/<capability>/spec.md` — delta requirements and concrete scenarios.
+   - `design.md` — architecture, components, and schemas.
+   - `tasks.md` — implementation checklist with explicit Traceability Matrix.
+
+3. **Mandatory Review & Gap Analysis (Self-Audit)**:
+   - Automated cross-check: compare generated artifacts against `explore.md`.
+   - Verify that NO user requirement or edge case from `explore.md` was lost or diluted.
+
+4. **Generate Interactive Spec Viewer**:
+   - Run:
+     ```bash
+     npx openspec-ex view openspec/changes/<change-name>
+     ```
+   - Present `spec-viewer.html` for human-in-the-loop review and block commenting.

@@ -1,7 +1,7 @@
 {
   "name": "openspec-ex",
-  "version": "1.0.1",
-  "description": "Enhanced Spec-Driven Development (SDD) CLI with SSOT Explore, Review Self-Audit, Multi-Agent Setup, and Interactive HTML Spec Viewer for OpenSpec",
+  "version": "1.0.2",
+  "description": "Enhanced Spec-Driven Development (SDD) CLI with Native Slash Commands, SSOT Explore, Review Self-Audit, Multi-Agent Setup, and Interactive HTML Spec Viewer for OpenSpec",
   "keywords": [
     "openspec",
     "specs",
@@ -36,6 +36,7 @@
     "src",
     "templates",
     "rules",
+    "skills",
     "README.md",
     "LICENSE"
   ],

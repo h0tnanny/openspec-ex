@@ -1,6 +1,6 @@
 /**
  * OpenSpec-Ex Installer Module
- * Full parity with OpenSpec AI agent detection and installation.
+ * Full parity with OpenSpec AI agent detection, skill generation, and rules installation.
  * Supports single agent, multi-select, and universal deployment.
  */
 
@@ -34,15 +34,71 @@ function detectActiveAgents(projectRoot) {
   return detected;
 }
 
+const SKILL_NAMES = [
+  'openspec-explore',
+  'openspec-propose',
+  'openspec-apply',
+  'openspec-view',
+  'openspec-archive'
+];
+
+function installSkillsForAgent(agent, projectRoot, packageRoot) {
+  const installed = [];
+  const skillsBaseDir = path.join(projectRoot, agent.skillsDir || '.agents', 'skills');
+
+  SKILL_NAMES.forEach(skillName => {
+    const srcSkill = path.join(packageRoot, 'skills', skillName, 'SKILL.md');
+    const destSkill = path.join(skillsBaseDir, skillName, 'SKILL.md');
+
+    if (fs.existsSync(srcSkill)) {
+      copyFileSync(srcSkill, destSkill);
+      installed.push(path.relative(projectRoot, destSkill));
+    }
+  });
+
+  return installed;
+}
+
+function installCursorRules(projectRoot, packageRoot) {
+  const installed = [];
+  const cursorRulesDir = path.join(projectRoot, '.cursor', 'rules');
+  ensureDirSync(cursorRulesDir);
+
+  SKILL_NAMES.forEach(skillName => {
+    const srcSkill = path.join(packageRoot, 'skills', skillName, 'SKILL.md');
+    const destRule = path.join(cursorRulesDir, `${skillName}.mdc`);
+
+    if (fs.existsSync(srcSkill)) {
+      let content = fs.readFileSync(srcSkill, 'utf8');
+      // Format as Cursor MDC
+      if (!content.startsWith('---')) {
+        content = `---\ndescription: OpenSpec command ${skillName}\nglobs: ["openspec/**", "**/*.md"]\n---\n\n${content}`;
+      } else {
+        content = content.replace(/^---\n([\s\S]*?)\n---/, (match, p1) => {
+          if (!p1.includes('globs:')) {
+            return `---\n${p1}\nglobs: ["openspec/**", "**/*.md"]\n---`;
+          }
+          return match;
+        });
+      }
+      ensureDirSync(path.dirname(destRule));
+      fs.writeFileSync(destRule, content, 'utf8');
+      installed.push(path.relative(projectRoot, destRule));
+    }
+  });
+
+  return installed;
+}
+
 function installForAgent(agentKey, projectRoot, packageRoot) {
   const agent = AGENTS[agentKey];
   if (!agent) {
     throw new Error(`Unknown agent: ${agentKey}`);
   }
 
-  const installedFiles = [];
+  let installedFiles = [];
 
-  // Determine rule file
+  // Determine main rule file
   const isCursor = (agentKey === 'cursor');
   const sourceRule = path.join(packageRoot, 'rules', isCursor ? 'openspec.mdc' : 'openspec.md');
   const targetRule = path.join(projectRoot, agent.rulePath);
@@ -59,6 +115,15 @@ function installForAgent(agentKey, projectRoot, packageRoot) {
       copyFileSync(sourceRule, targetFallback);
       installedFiles.push(path.relative(projectRoot, targetFallback));
     }
+  }
+
+  // Install Skills / Commands
+  if (isCursor) {
+    const cursorFiles = installCursorRules(projectRoot, packageRoot);
+    installedFiles = installedFiles.concat(cursorFiles);
+  } else {
+    const skillFiles = installSkillsForAgent(agent, projectRoot, packageRoot);
+    installedFiles = installedFiles.concat(skillFiles);
   }
 
   // Copy templates
@@ -111,8 +176,8 @@ async function runInteractiveInstaller(options = {}) {
   const projectRoot = options.cwd || process.cwd();
   const packageRoot = path.resolve(__dirname, '..');
 
-  console.log('\n\x1b[1m\x1b[36m▲ OpenSpec-Ex — Universal AI Agent Setup\x1b[0m');
-  console.log('\x1b[90mEnhanced Spec-Driven Development with SSOT Explore, Review Audit & Interactive Spec Viewer\x1b[0m\n');
+  console.log('\n\x1b[1m\x1b[36m▲ OpenSpec-Ex — Native Slash Commands & Agent Skills Setup\x1b[0m');
+  console.log('\x1b[90mRegisters native /explore, /propose, /apply, /view, and /archive commands for your AI\x1b[0m\n');
 
   const detectedAgents = detectActiveAgents(projectRoot);
   let selectedAgentKeys = [];
@@ -129,7 +194,7 @@ async function runInteractiveInstaller(options = {}) {
   }
 
   if (selectedAgentKeys.length === 0) {
-    console.log('\x1b[1mSupported AI Coding Assistants & IDEs:\x1b[0m\n');
+    console.log('\x1b[1mSelect AI Coding Assistant(s) to register commands:\x1b[0m\n');
 
     AI_TOOLS.forEach((tool, idx) => {
       const isDetected = detectedAgents.includes(tool.id) ? ' \x1b[32m[DETECTED IN WORKSPACE]\x1b[0m' : '';
@@ -179,15 +244,13 @@ async function runInteractiveInstaller(options = {}) {
     selectedAgentKeys = ['antigravity'];
   }
 
-  // Deduplicate
   selectedAgentKeys = [...new Set(selectedAgentKeys)];
 
-  console.log(`\n\x1b[36m→ Installing OpenSpec-Ex for ${selectedAgentKeys.length} agent(s):\x1b[0m`);
+  console.log(`\n\x1b[36m→ Registering native OpenSpec commands & skills for ${selectedAgentKeys.length} agent(s):\x1b[0m`);
   selectedAgentKeys.forEach(k => {
-    console.log(`  \x1b[32m✔\x1b[0m \x1b[1m${AGENTS[k].name}\x1b[0m (\x1b[90m${AGENTS[k].rulePath}\x1b[0m)`);
+    console.log(`  \x1b[32m✔\x1b[0m \x1b[1m${AGENTS[k].name}\x1b[0m`);
   });
 
-  // Scaffold OpenSpec directories
   initOpenSpecScaffold(projectRoot, packageRoot);
 
   let allInstalledFiles = [];
@@ -196,7 +259,6 @@ async function runInteractiveInstaller(options = {}) {
     allInstalledFiles = allInstalledFiles.concat(files);
   });
 
-  // Ensure local helper script in .agents/scripts/generate-viewer.js
   const localScriptPath = path.join(projectRoot, '.agents', 'scripts', 'generate-viewer.js');
   const srcScriptPath = path.join(packageRoot, '.agents', 'scripts', 'generate-viewer.js');
   if (fs.existsSync(srcScriptPath)) {
@@ -206,8 +268,8 @@ async function runInteractiveInstaller(options = {}) {
 
   const pkgUpdated = updateProjectPackageJson(projectRoot);
 
-  console.log('\n\x1b[32m✔ Setup complete!\x1b[0m\n');
-  console.log('\x1b[1mConfigured Files & Templates:\x1b[0m');
+  console.log('\n\x1b[32m✔ Commands & Skills registered successfully!\x1b[0m\n');
+  console.log('\x1b[1mRegistered Slash Commands & Files:\x1b[0m');
   [...new Set(allInstalledFiles)].forEach(f => {
     console.log(`  \x1b[90m+\x1b[0m ${f}`);
   });
@@ -216,11 +278,12 @@ async function runInteractiveInstaller(options = {}) {
     console.log('  \x1b[90m+\x1b[0m package.json (added "spec:view" script)');
   }
 
-  console.log('\n\x1b[1m\x1b[36mHow to use in your project:\x1b[0m');
-  console.log('  1. \x1b[33m/explore <your feature or idea>\x1b[0m — Q&A interview & SSOT explore.md generation');
-  console.log('  2. \x1b[33m/propose <change-name>\x1b[0m           — Spec generation strictly from SSOT + gap analysis');
-  console.log('  3. \x1b[33mnpx openspec-ex view <change-name>\x1b[0m   — Interactive review with block-level comments & export');
-  console.log('  4. \x1b[33m/apply <change-name>\x1b[0m             — Execute implementation tasks once feedback is resolved\n');
+  console.log('\n\x1b[1m\x1b[36mNative Slash Commands ready in your AI Chat:\x1b[0m');
+  console.log('  👉 \x1b[33m/explore <idea>\x1b[0m  (or /opsx:explore) — Proactive interview & SSOT explore.md');
+  console.log('  👉 \x1b[33m/propose <name>\x1b[0m  (or /opsx:propose) — Strict SSOT proposal + gap analysis audit');
+  console.log('  👉 \x1b[33m/view <name>\x1b[0m     (or /opsx:view)    — Generate & open interactive HTML report');
+  console.log('  👉 \x1b[33m/apply <name>\x1b[0m    (or /opsx:apply)   — Implement tasks once feedback is resolved');
+  console.log('  👉 \x1b[33m/archive <name>\x1b[0m  (or /opsx:archive) — Move completed change to archive\n');
 }
 
 module.exports = {

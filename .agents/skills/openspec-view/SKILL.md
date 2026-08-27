@@ -1,0 +1,17 @@
+---
+name: openspec-view
+description: Generate and open the interactive standalone HTML spec viewer (spec-viewer.html) with comment feedback loop.
+---
+
+# /opsx:view (Interactive Spec Viewer)
+
+Generate and open the standalone `spec-viewer.html` for any change.
+
+## Workflow
+
+1. **Run Viewer Generator**:
+   ```bash
+   npx openspec-ex view [change-path-or-id]
+   ```
+2. **Review & Comment**:
+   - Review blocks across tabs, leave comments, and export feedback via «Скопировать для ИИ».
