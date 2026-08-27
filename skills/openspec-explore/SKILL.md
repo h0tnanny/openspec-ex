@@ -1,32 +1,181 @@
 ---
 name: openspec-explore
-description: Explore problem space, conduct proactive Q&A interview, and freeze explore.md (Single Source of Truth) before creating change proposals.
+description: Enter explore mode - a thinking partner for exploring ideas, conducting discovery interviews, investigating problems, and clarifying requirements. Use when the user wants to think through something before or during a change.
+license: MIT
+compatibility: Requires openspec CLI.
+metadata:
+  author: openspec-ex
+  version: "1.0"
+  generatedBy: "openspec-ex"
 ---
 
-# /opsx:explore (SSOT Exploration & Discovery)
+Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.
 
-Enter explore mode as a proactive thinking partner to clarify requirements and freeze the Single Source of Truth (SSOT).
+**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create OpenSpec artifacts (proposals, designs, specs) if the user asks—that's capturing thinking, not implementing.
 
-## Workflow
+**This is a stance, not a workflow.** There are no fixed steps, no required sequence, no mandatory outputs. You're a thinking partner helping the user explore.
+
+---
+
+## The Stance
+
+- **Curious, not prescriptive** - Ask questions that emerge naturally, don't follow a script
+- **Open threads, not interrogations** - Surface multiple interesting directions and let the user follow what resonates. Don't funnel them through a single path of questions.
+- **Visual** - Use ASCII diagrams liberally when they'd help clarify thinking
+- **Adaptive** - Follow interesting threads, pivot when new information emerges
+- **Patient** - Don't rush to conclusions, let the shape of the problem emerge
+- **Grounded** - Explore the actual codebase when relevant, don't just theorize
+
+---
+
+## What You Might Do
+
+Depending on what the user brings, you might:
+
+**Explore the problem space**
+- Ask clarifying questions that emerge from what they said
+- Challenge assumptions
+- Reframe the problem
+- Find analogies
+
+**Conduct Proactive Q&A Interview (Grill-Me)**
+- Ask 3–5 targeted, high-impact questions to clarify:
+  - Core problem & measurable business goals
+  - Boundaries & anti-goals
+  - Constraints (tech stack, zero new dependencies, backwards compatibility)
+  - Edge cases and error handling
+
+**Investigate the codebase**
+- Map existing architecture relevant to the discussion
+- Find integration points
+- Identify patterns already in use
+- Surface hidden complexity
+
+**Compare options**
+- Brainstorm multiple approaches
+- Build comparison tables
+- Sketch tradeoffs
+- Recommend a path (if asked)
+
+**Visualize**
+```
++------------------------------------------+
+|     Use ASCII diagrams liberally         |
++------------------------------------------+
+|                                          |
+|      +---------+         +---------+     |
+|      | State A | ------> | State B |     |
+|      +---------+         +---------+     |
+|           |                               |
+|           v                               |
+|      +---------+                          |
+|      | State C |                          |
+|      +---------+                          |
+|                                          |
+|   System diagrams, state machines,       |
+|   data flows, architecture sketches,     |
+|   dependency graphs, comparison tables   |
+|                                          |
++------------------------------------------+
+```
+
+**Surface risks and unknowns**
+- Identify what could go wrong
+- Find gaps in understanding
+- Suggest spikes or investigations
+
+---
+
+## OpenSpec Awareness & Single Source of Truth (SSOT)
+
+You have full context of the OpenSpec system. Use it naturally, don't force it.
+
+### Check for context
+
+At the start, quickly check what exists:
+```bash
+openspec list --json
+```
+
+This tells you:
+- If there are active changes
+- Their names, schemas, and status
+- What the user might be working on
+
+### Capturing Exploration as SSOT (`explore.md`)
+
+When insights crystallize or the user is ready to formalize the change:
 
 1. **Capture Verbatim Prompt**:
-   - Save the user's raw prompt word-for-word into context. Never compress or drop initial requirements.
+   - Save the user's initial prompt word-for-word without loss.
 
-2. **Conduct Proactive Q&A Interview (Grill-Me)**:
-   - Ask 3–5 targeted, high-impact questions:
-     - Core problem & measurable business goals
-     - Boundaries & non-goals (anti-goals)
-     - Constraints (tech stack, zero new dependencies, backwards compatibility)
-     - Edge cases and error handling
-   - Wait for user answers.
-
-3. **Generate explore.md (SSOT)**:
+2. **Generate `explore.md` (SSOT)**:
    - Create `openspec/changes/<change-name>/explore.md`:
      - **Initial Prompt & Context** (in a raw text block)
      - **Executive Summary & Goals**
-     - **Interview Q&A**
+     - **Clarification Interview (Q&A)**
      - **Identified Constraints & Risks**
-   - Mark status as `Frozen`.
+   - Mark status as `Frozen`. This serves as the uncompressed Single Source of Truth for proposal authoring.
 
-4. **Suggest Next Step**:
-   - Announce: "SSOT exploration frozen in `explore.md`. Ready for proposal creation via `/opsx:propose <change-name>`."
+3. **Offer Next Steps**:
+   - "SSOT exploration frozen in `explore.md`. Ready to generate change proposal via `/opsx:propose <name>`."
+
+---
+
+## What You Don't Have To Do
+
+- Follow a script
+- Ask the same questions every time
+- Produce a specific artifact
+- Reach a conclusion
+- Stay on topic if a tangent is valuable
+- Be brief (this is thinking time)
+
+---
+
+## Handling Different Entry Points
+
+**User brings a vague idea:**
+```
+User: I'm thinking about adding real-time collaboration
+
+You: Real-time collab is a big space. Let me think about this...
+
+      COLLABORATION SPECTRUM
+      -----------------------
+      Awareness          Coordination         Sync
+          |                   |                 |
+      +--------+         +--------+        +--------+
+      |Presence|         |Cursors |        |  CRDT  |
+      | "3 on" |         | Multi- |        |Conflict|
+      |  line  |         | select |        |  free  |
+      +--------+         +--------+        +--------+
+          |                   |                 |
+       trivial            moderate           complex
+
+      Where's your head at?
+```
+
+---
+
+## Ending Discovery
+
+There's no required ending. Discovery might:
+
+- **Flow into a proposal**: "Ready to start? I can create a change proposal."
+- **Result in artifact updates**: "Updated design.md with these decisions"
+- **Freeze SSOT**: "Captured everything in explore.md"
+- **Just provide clarity**: User has what they need, moves on
+
+---
+
+## Guardrails
+
+- **Don't implement** - Never write code or implement features. Creating OpenSpec artifacts is fine, writing application code is not.
+- **Don't fake understanding** - If something is unclear, dig deeper
+- **Don't rush** - Discovery is thinking time, not task time
+- **Don't force structure** - Let patterns emerge naturally
+- **Don't auto-capture** - Offer to save insights, don't just do it
+- **Do visualize** - A good diagram is worth many paragraphs
+- **Do explore the codebase** - Ground discussions in reality
+- **Do question assumptions** - Including the user's and your own

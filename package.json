@@ -1,7 +1,7 @@
 {
   "name": "openspec-ex",
-  "version": "1.0.2",
-  "description": "Enhanced Spec-Driven Development (SDD) CLI with Native Slash Commands, SSOT Explore, Review Self-Audit, Multi-Agent Setup, and Interactive HTML Spec Viewer for OpenSpec",
+  "version": "1.0.3",
+  "description": "Enhanced Spec-Driven Development (SDD) CLI with Native OpenSpec Skills Parity (explore, propose, apply-change, archive-change, sync-specs, view), SSOT Explore, Review Self-Audit, Multi-Agent Setup, and Interactive HTML Spec Viewer",
   "keywords": [
     "openspec",
     "specs",

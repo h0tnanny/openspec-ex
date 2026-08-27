@@ -37,9 +37,10 @@ function detectActiveAgents(projectRoot) {
 const SKILL_NAMES = [
   'openspec-explore',
   'openspec-propose',
-  'openspec-apply',
-  'openspec-view',
-  'openspec-archive'
+  'openspec-apply-change',
+  'openspec-archive-change',
+  'openspec-sync-specs',
+  'openspec-view'
 ];
 
 function installSkillsForAgent(agent, projectRoot, packageRoot) {
@@ -70,7 +71,6 @@ function installCursorRules(projectRoot, packageRoot) {
 
     if (fs.existsSync(srcSkill)) {
       let content = fs.readFileSync(srcSkill, 'utf8');
-      // Format as Cursor MDC
       if (!content.startsWith('---')) {
         content = `---\ndescription: OpenSpec command ${skillName}\nglobs: ["openspec/**", "**/*.md"]\n---\n\n${content}`;
       } else {
@@ -98,7 +98,6 @@ function installForAgent(agentKey, projectRoot, packageRoot) {
 
   let installedFiles = [];
 
-  // Determine main rule file
   const isCursor = (agentKey === 'cursor');
   const sourceRule = path.join(packageRoot, 'rules', isCursor ? 'openspec.mdc' : 'openspec.md');
   const targetRule = path.join(projectRoot, agent.rulePath);
@@ -108,7 +107,6 @@ function installForAgent(agentKey, projectRoot, packageRoot) {
     installedFiles.push(path.relative(projectRoot, targetRule));
   }
 
-  // If fallback rule exists (e.g. .cursorrules or CLAUDE.md)
   if (agent.fallbackRulePath) {
     const targetFallback = path.join(projectRoot, agent.fallbackRulePath);
     if (!fs.existsSync(targetFallback)) {
@@ -117,7 +115,6 @@ function installForAgent(agentKey, projectRoot, packageRoot) {
     }
   }
 
-  // Install Skills / Commands
   if (isCursor) {
     const cursorFiles = installCursorRules(projectRoot, packageRoot);
     installedFiles = installedFiles.concat(cursorFiles);
@@ -126,7 +123,6 @@ function installForAgent(agentKey, projectRoot, packageRoot) {
     installedFiles = installedFiles.concat(skillFiles);
   }
 
-  // Copy templates
   const templateFiles = ['explore.md', 'proposal.md', 'design.md', 'tasks.md'];
   const targetTemplateDir = path.join(projectRoot, agent.templateDir || '.openspec/templates');
 
@@ -177,7 +173,7 @@ async function runInteractiveInstaller(options = {}) {
   const packageRoot = path.resolve(__dirname, '..');
 
   console.log('\n\x1b[1m\x1b[36m▲ OpenSpec-Ex — Native Slash Commands & Agent Skills Setup\x1b[0m');
-  console.log('\x1b[90mRegisters native /explore, /propose, /apply, /view, and /archive commands for your AI\x1b[0m\n');
+  console.log('\x1b[90mRegisters 100% authentic OpenSpec commands with SSOT Explore, Self-Audit Review & Interactive Viewer\x1b[0m\n');
 
   const detectedAgents = detectActiveAgents(projectRoot);
   let selectedAgentKeys = [];
@@ -268,7 +264,7 @@ async function runInteractiveInstaller(options = {}) {
 
   const pkgUpdated = updateProjectPackageJson(projectRoot);
 
-  console.log('\n\x1b[32m✔ Commands & Skills registered successfully!\x1b[0m\n');
+  console.log('\n\x1b[32m✔ Authentic OpenSpec Skills & Commands registered successfully!\x1b[0m\n');
   console.log('\x1b[1mRegistered Slash Commands & Files:\x1b[0m');
   [...new Set(allInstalledFiles)].forEach(f => {
     console.log(`  \x1b[90m+\x1b[0m ${f}`);
@@ -279,11 +275,12 @@ async function runInteractiveInstaller(options = {}) {
   }
 
   console.log('\n\x1b[1m\x1b[36mNative Slash Commands ready in your AI Chat:\x1b[0m');
-  console.log('  👉 \x1b[33m/explore <idea>\x1b[0m  (or /opsx:explore) — Proactive interview & SSOT explore.md');
-  console.log('  👉 \x1b[33m/propose <name>\x1b[0m  (or /opsx:propose) — Strict SSOT proposal + gap analysis audit');
-  console.log('  👉 \x1b[33m/view <name>\x1b[0m     (or /opsx:view)    — Generate & open interactive HTML report');
-  console.log('  👉 \x1b[33m/apply <name>\x1b[0m    (or /opsx:apply)   — Implement tasks once feedback is resolved');
-  console.log('  👉 \x1b[33m/archive <name>\x1b[0m  (or /opsx:archive) — Move completed change to archive\n');
+  console.log('  👉 \x1b[33m/explore <idea>\x1b[0m         (or /opsx:explore) — Proactive interview & SSOT explore.md');
+  console.log('  👉 \x1b[33m/propose <name>\x1b[0m         (or /opsx:propose) — Strict SSOT proposal + review gap audit');
+  console.log('  👉 \x1b[33m/view <name>\x1b[0m            (or /opsx:view)    — Generate & open interactive HTML report');
+  console.log('  👉 \x1b[33m/apply <name>\x1b[0m           (or /opsx:apply)   — Implement tasks once feedback is resolved');
+  console.log('  👉 \x1b[33m/sync <name>\x1b[0m            (or /opsx:sync)    — Sync delta specs with main specs');
+  console.log('  👉 \x1b[33m/archive <name>\x1b[0m         (or /opsx:archive) — Finalize and move change to archive\n');
 }
 
 module.exports = {
