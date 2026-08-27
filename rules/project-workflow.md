@@ -37,6 +37,7 @@ All future development, fixes, tests, and documentation for the OpenSpec-Ex proj
   - `fix(OEX-<number>): <message>`
   - `test(OEX-<number>): <message>`
   - `docs(OEX-<number>): <message>`
+  - `chore(OEX-<number>): <message>`
 
 ---
 
@@ -52,3 +53,11 @@ All future development, fixes, tests, and documentation for the OpenSpec-Ex proj
 A Pull Request can **ONLY** be merged into `main` when **BOTH** conditions are satisfied:
 1. ✅ **Condition 1 (CI Gate)**: GitHub Actions workflow (`CI, Build & Package`) has completed successfully (`success`).
 2. 👤 **Condition 2 (Human Approval Gate)**: The User has given explicit, direct permission to merge (e.g., "Merge allowed", "Да, мержи").
+
+---
+
+## 6. Automated Package, Release & Publishing Protocol
+Upon every merge into `main`:
+1. **GitHub Package Publishing**: The package is automatically built and published to GitHub Packages (`@h0tnanny/openspec-ex`).
+2. **NPM Registry Publishing**: The package is automatically published to npm public registry (`openspec-ex`) via `NPM_TOKEN`.
+3. **GitHub Release Creation**: A formal GitHub Release (`v<version>`) is created with automated release notes and the `.tgz` package tarball attached.
