@@ -35,6 +35,10 @@
     "rules",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "test": "node bin/cli.js --help",
     "spec:view": "openspec-ex view"
