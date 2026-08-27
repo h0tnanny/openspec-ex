@@ -7,11 +7,12 @@ const AI_TOOLS = [
   {
     id: 'antigravity',
     name: 'Google Antigravity / Gemini',
-    skillsDir: '.agents',
-    rulePath: '.agents/rules/openspec.md',
-    templateDir: '.agents/templates',
-    detectionPaths: ['.agent', '.agents/workflows', '.agents'],
-    description: 'Google Antigravity (.agents/rules/openspec.md)'
+    skillsDir: '.agent',
+    workflowDir: '.agent/workflows',
+    rulePath: '.agent/rules/openspec.md',
+    templateDir: 'openspec/templates',
+    detectionPaths: ['.agent', '.agent/workflows'],
+    description: 'Google Antigravity (.agent/workflows, .agent/skills, .agent/rules)'
   },
   {
     id: 'cursor',

@@ -34,9 +34,11 @@
   "files": [
     "bin",
     "src",
+    "scripts",
     "templates",
     "rules",
     "skills",
+    "workflows",
     "README.md",
     "LICENSE"
   ],

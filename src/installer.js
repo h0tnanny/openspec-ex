@@ -43,6 +43,14 @@ const SKILL_NAMES = [
   'openspec-sync-specs'
 ];
 
+const WORKFLOW_FILES = [
+  'opsx-explore.md',
+  'opsx-propose.md',
+  'opsx-apply.md',
+  'opsx-sync.md',
+  'opsx-archive.md'
+];
+
 function initOpenSpecScaffold(projectRoot) {
   const scaffoldDirs = [
     path.join(projectRoot, 'openspec', 'changes'),
@@ -78,7 +86,7 @@ rules:
 
 function installSkillsForAgent(agent, projectRoot, packageRoot) {
   const installed = [];
-  const skillsBaseDir = path.join(projectRoot, agent.skillsDir || '.agents', 'skills');
+  const skillsBaseDir = path.join(projectRoot, agent.skillsDir || '.agent', 'skills');
 
   SKILL_NAMES.forEach(skillName => {
     const srcSkill = path.join(packageRoot, 'skills', skillName, 'SKILL.md');
@@ -87,6 +95,24 @@ function installSkillsForAgent(agent, projectRoot, packageRoot) {
     if (fs.existsSync(srcSkill)) {
       copyFileSync(srcSkill, destSkill);
       installed.push(path.relative(projectRoot, destSkill));
+    }
+  });
+
+  return installed;
+}
+
+function installWorkflowsForAgent(agent, projectRoot, packageRoot) {
+  const installed = [];
+  if (!agent.workflowDir) return installed;
+  const wfDir = path.join(projectRoot, agent.workflowDir);
+
+  WORKFLOW_FILES.forEach(wfName => {
+    const srcWf = path.join(packageRoot, 'workflows', wfName);
+    const destWf = path.join(wfDir, wfName);
+
+    if (fs.existsSync(srcWf)) {
+      copyFileSync(srcWf, destWf);
+      installed.push(path.relative(projectRoot, destWf));
     }
   });
 
@@ -154,23 +180,23 @@ function installForAgent(agentKey, projectRoot, packageRoot) {
   } else {
     const skillFiles = installSkillsForAgent(agent, projectRoot, packageRoot);
     installedFiles = installedFiles.concat(skillFiles);
+
+    if (agent.workflowDir) {
+      const workflowFiles = installWorkflowsForAgent(agent, projectRoot, packageRoot);
+      installedFiles = installedFiles.concat(workflowFiles);
+    }
   }
 
   const templateFiles = ['explore.md', 'proposal.md', 'design.md', 'tasks.md'];
-  const targetTemplateDirs = [
-    path.join(projectRoot, agent.templateDir || '.openspec/templates'),
-    path.join(projectRoot, 'openspec', 'templates')
-  ];
+  const targetTemplateDir = path.join(projectRoot, 'openspec', 'templates');
 
   templateFiles.forEach(tf => {
     const srcTf = path.join(packageRoot, 'templates', tf);
-    targetTemplateDirs.forEach(td => {
-      const destTf = path.join(td, tf);
-      if (fs.existsSync(srcTf)) {
-        copyFileSync(srcTf, destTf);
-        installedFiles.push(path.relative(projectRoot, destTf));
-      }
-    });
+    const destTf = path.join(targetTemplateDir, tf);
+    if (fs.existsSync(srcTf)) {
+      copyFileSync(srcTf, destTf);
+      installedFiles.push(path.relative(projectRoot, destTf));
+    }
   });
 
   return installedFiles;
@@ -279,6 +305,16 @@ async function runInteractiveInstaller(options = {}) {
 
   initOpenSpecScaffold(projectRoot);
 
+  // Clean up legacy .agents duplicate directory if present
+  const legacyAgentsDir = path.join(projectRoot, '.agents');
+  if (fs.existsSync(legacyAgentsDir)) {
+    try {
+      fs.rmSync(legacyAgentsDir, { recursive: true, force: true });
+    } catch (e) {
+      // ignore
+    }
+  }
+
   let allInstalledFiles = [
     path.relative(projectRoot, path.join(projectRoot, 'openspec', 'config.yaml'))
   ];
@@ -288,8 +324,8 @@ async function runInteractiveInstaller(options = {}) {
     allInstalledFiles = allInstalledFiles.concat(files);
   });
 
-  const localScriptPath = path.join(projectRoot, '.agents', 'scripts', 'generate-viewer.js');
-  const srcScriptPath = path.join(packageRoot, '.agents', 'scripts', 'generate-viewer.js');
+  const localScriptPath = path.join(projectRoot, '.agent', 'scripts', 'generate-viewer.js');
+  const srcScriptPath = path.join(packageRoot, 'scripts', 'generate-viewer.js');
   if (fs.existsSync(srcScriptPath)) {
     copyFileSync(srcScriptPath, localScriptPath);
     allInstalledFiles.push(path.relative(projectRoot, localScriptPath));
