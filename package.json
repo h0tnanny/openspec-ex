@@ -39,6 +39,7 @@
     "rules",
     "skills",
     "workflows",
+    "docs",
     "README.md",
     "LICENSE"
   ],
@@ -47,7 +48,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "test": "node bin/cli.js --help",
+    "test": "node test/run-all-tests.js",
     "spec:view": "openspec-ex view"
   },
   "engines": {

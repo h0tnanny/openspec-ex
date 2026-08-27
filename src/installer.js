@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { AI_TOOLS, AGENTS } = require('./agents.js');
+const { applyPreset } = require('./presets.js');
 
 function ensureDirSync(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -34,13 +35,14 @@ function detectActiveAgents(projectRoot) {
   return detected;
 }
 
-// Strictly the 5 authentic OpenSpec skills
+// Core OpenSpec-Ex skills & command customization
 const SKILL_NAMES = [
   'openspec-explore',
   'openspec-propose',
   'openspec-apply-change',
   'openspec-archive-change',
-  'openspec-sync-specs'
+  'openspec-sync-specs',
+  'openspec-edit'
 ];
 
 const WORKFLOW_FILES = [
@@ -48,7 +50,8 @@ const WORKFLOW_FILES = [
   'opsx-propose.md',
   'opsx-apply.md',
   'opsx-sync.md',
-  'opsx-archive.md'
+  'opsx-archive.md',
+  'opsx-edit.md'
 ];
 
 function initOpenSpecScaffold(projectRoot) {
@@ -332,6 +335,16 @@ async function runInteractiveInstaller(options = {}) {
   }
 
   const pkgUpdated = updateProjectPackageJson(projectRoot);
+
+  if (options.preset) {
+    try {
+      console.log(`\n\x1b[36m→ Applying preset '${options.preset}'...\x1b[0m`);
+      const presetRes = applyPreset(options.preset, { cwd: projectRoot });
+      console.log(`\x1b[32m✔ Preset '${options.preset}' applied successfully!\x1b[0m (${presetRes.appliedFilesCount} files updated)`);
+    } catch (e) {
+      console.log(`\x1b[33mWarning: Failed to apply preset '${options.preset}': ${e.message}\x1b[0m`);
+    }
+  }
 
   console.log('\n\x1b[32m✔ OpenSpec skills updated successfully!\x1b[0m\n');
   console.log('\x1b[1mUpdated Core Skills & Config:\x1b[0m');
