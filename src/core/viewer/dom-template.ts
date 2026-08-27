@@ -1,403 +1,24 @@
-/**
- * OpenSpec Interactive HTML Spec Viewer Generator Module
- * Generates standalone, zero-dependency shadcn/ui dark interactive HTML report.
- * Supports SSOT Explore, Subagent Discovery Insights, Design, Proposal, Tasks,
- * Task Completion Progress, Interactive Mermaid Diagrams with Pan/Zoom & Fullscreen,
- * and Feedback Export to AI & feedback.md.
- */
+import { SpecViewerData } from '../../types/viewer';
+import { escapeHtml } from './mermaid-renderer';
 
-const fs = require('fs');
-const path = require('path');
-
-function generateSpecViewer(targetDirectory) {
-  const resolvedDir = path.resolve(targetDirectory);
-  if (!fs.existsSync(resolvedDir)) {
-    throw new Error(`Directory not found: ${resolvedDir}`);
+export function buildFullHtml(
+  data: SpecViewerData,
+  renderedTabs: {
+    explore: string;
+    discovery: string;
+    design: string;
+    proposal: string;
+    tasks: string;
   }
+): string {
+  const { changeId, completedTasks, totalTasks, taskPercent, discoveryFiles } = data;
 
-  const changeId = path.basename(resolvedDir);
-
-  function readFileSafe(filename) {
-    const filePath = path.join(resolvedDir, filename);
-    if (fs.existsSync(filePath)) {
-      return fs.readFileSync(filePath, 'utf8');
-    }
-    return null;
-  }
-
-  const exploreMd = readFileSafe('explore.md') || '# Explore\n*No explore.md found.*';
-  const proposalMd = readFileSafe('proposal.md') || '# Proposal\n*No proposal.md found.*';
-  const designMd = readFileSafe('design.md') || '# Design\n*No design.md found.*';
-  const tasksMd = readFileSafe('tasks.md') || '# Tasks\n*No tasks.md found.*';
-
-  // Read subagent discovery briefs if available
-  const discoveryDir = path.join(resolvedDir, 'discovery');
-  let discoveryFiles = [];
-  if (fs.existsSync(discoveryDir)) {
-    try {
-      discoveryFiles = fs.readdirSync(discoveryDir)
-        .filter(f => f.endsWith('.md'))
-        .sort()
-        .map(f => ({
-          name: f,
-          title: f.replace(/^\d+[-_]?/, '').replace(/\.md$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-          content: fs.readFileSync(path.join(discoveryDir, f), 'utf8')
-        }));
-    } catch (e) {
-      discoveryFiles = [];
-    }
-  }
-
-  // Calculate task completion progress
-  let totalTasks = 0;
-  let completedTasks = 0;
-  const taskMatches = tasksMd.matchAll(/-\s+\[([ xX])\]/g);
-  for (const match of taskMatches) {
-    totalTasks++;
-    if (match[1].toLowerCase() === 'x') completedTasks++;
-  }
-  const taskPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-  function parseMarkdown(md, sectionKey, sectionTitle) {
-    const lines = md.split('\n');
-    let html = '';
-    let inCodeBlock = false;
-    let codeLang = '';
-    let codeBuffer = [];
-    let inTable = false;
-    let tableBuffer = [];
-    let inQuote = false;
-    let quoteBuffer = [];
-    let listType = null;
-    let blockIndex = 0;
-
-    function flushList() {
-      if (listType === 'tasks') {
-        html += '</div>\n';
-        listType = null;
-      } else if (listType === 'standard') {
-        html += '</ul>\n';
-        listType = null;
-      }
-    }
-
-    function flushQuote() {
-      if (inQuote && quoteBuffer.length > 0) {
-        blockIndex++;
-        const bId = `${sectionKey}-quote-${blockIndex}`;
-        let alertType = 'note';
-        let title = 'Справка';
-        let cleanLines = [...quoteBuffer];
-        const firstLine = cleanLines[0].trim();
-
-        if (firstLine.startsWith('[!NOTE]')) {
-          alertType = 'note';
-          title = 'Справка';
-          cleanLines[0] = firstLine.replace('[!NOTE]', '').trim();
-        } else if (firstLine.startsWith('[!IMPORTANT]')) {
-          alertType = 'important';
-          title = 'Важно';
-          cleanLines[0] = firstLine.replace('[!IMPORTANT]', '').trim();
-        } else if (firstLine.startsWith('[!WARNING]')) {
-          alertType = 'warning';
-          title = 'Внимание';
-          cleanLines[0] = firstLine.replace('[!WARNING]', '').trim();
-        } else if (firstLine.startsWith('[!TIP]')) {
-          alertType = 'note';
-          title = 'Совет';
-          cleanLines[0] = firstLine.replace('[!TIP]', '').trim();
-        }
-
-        const contentText = cleanLines.filter(l => l.length > 0).join(' ');
-
-        html += `<div class="spec-block alert alert-${alertType}" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-          <div class="alert-content">
-            <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            <div class="alert-body">
-              <span class="alert-title">${escapeHtml(title)}:</span>
-              <span class="alert-text">${parseInline(contentText)}</span>
-            </div>
-          </div>
-          <button class="block-comment-trigger" data-action="comment-trigger" data-block-id="${bId}" data-ref="${escapeHtml(title)}: ${escapeHtml(contentText.substring(0, 50))}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            Замечание
-          </button>
-        </div>\n`;
-
-        inQuote = false;
-        quoteBuffer = [];
-      }
-    }
-
-    function flushTable() {
-      if (inTable) {
-        html += '<div class="table-wrapper"><table class="shadcn-table">\n';
-        tableBuffer.forEach((row, rIdx) => {
-          const cols = row.split('|').filter((_, i, arr) => i > 0 && i < arr.length - 1).map(c => c.trim());
-          if (rIdx === 0) {
-            html += '<thead><tr>' + cols.map(c => `<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead>\n<tbody>\n';
-          } else if (rIdx === 1 && cols.every(c => /^:?-+:?$/.test(c))) {
-            // separator
-          } else {
-            html += '<tr>' + cols.map(c => `<td>${parseInline(c)}</td>`).join('') + '</tr>\n';
-          }
-        });
-        html += '</tbody></table></div>\n';
-        inTable = false;
-        tableBuffer = [];
-      }
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      if (line.startsWith('>')) {
-        flushList();
-        flushTable();
-        inQuote = true;
-        quoteBuffer.push(line.replace(/^>\s*/, ''));
-        continue;
-      } else if (inQuote) {
-        flushQuote();
-      }
-
-      if (line.startsWith('```')) {
-        if (inCodeBlock) {
-          blockIndex++;
-          const bId = `${sectionKey}-block-${blockIndex}`;
-          const isTextarea = (!codeLang || codeLang === 'text' || codeLang === 'prompt' || codeLang === 'raw');
-          const isMermaid = (codeLang === 'mermaid');
-          
-          if (isMermaid) {
-            html += `<div class="spec-block mermaid-card" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-              <div class="code-card-header">
-                <div class="mermaid-header-left">
-                  <span class="code-lang-badge">MERMAID DIAGRAM</span>
-                </div>
-                <div class="mermaid-header-actions">
-                  <button class="btn btn-ghost diagram-btn" title="Приблизить" onclick="zoomInlineDiagram('${bId}', 1.25)">🔍 +</button>
-                  <button class="btn btn-ghost diagram-btn" title="Отдалить" onclick="zoomInlineDiagram('${bId}', 0.8)">🔍 -</button>
-                  <button class="btn btn-ghost diagram-btn" title="Сбросить масштаб" onclick="resetInlineDiagram('${bId}')">1:1</button>
-                  <button class="btn btn-ghost diagram-btn btn-fullscreen-trigger" title="Развернуть на весь экран" onclick="openDiagramFullscreen('${bId}')">⛶ На весь экран</button>
-                  <button class="block-comment-trigger-static" data-action="comment-trigger" data-block-id="${bId}" data-ref="Диаграмма Mermaid" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                    Замечание
-                  </button>
-                </div>
-              </div>
-              <div class="mermaid-viewport" id="viewport-${bId}" data-block-id="${bId}">
-                <div class="mermaid-canvas" id="canvas-${bId}">
-                  <div class="mermaid" id="mermaid-raw-${bId}">${escapeHtml(codeBuffer.join('\n'))}</div>
-                </div>
-              </div>
-              <div class="mermaid-card-footer">
-                <span>💡 Колесико мыши: масштаб • Перетаскивание: перемещение • Кнопка <b>⛶ На весь экран</b> для максимального обзора</span>
-              </div>
-            </div>\n`;
-          } else if (isTextarea) {
-            html += `<div class="spec-block prompt-textarea-card" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-              <div class="textarea-header">
-                <span class="textarea-badge">Исходный запрос / Промпт</span>
-                <button class="block-comment-trigger" data-action="comment-trigger" data-block-id="${bId}" data-ref="Промпт: ${escapeHtml(codeBuffer.join(' ').substring(0, 50))}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                  Замечание
-                </button>
-              </div>
-              <textarea class="shadcn-content-textarea" readonly>${escapeHtml(codeBuffer.join('\n'))}</textarea>
-            </div>\n`;
-          } else {
-            html += `<div class="spec-block code-card" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-              <div class="code-card-header">
-                <span class="code-lang-badge">${escapeHtml(codeLang)}</span>
-                <button class="block-comment-trigger" data-action="comment-trigger" data-block-id="${bId}" data-ref="Код: ${escapeHtml(codeLang)}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                  Замечание
-                </button>
-              </div>
-              <pre><code class="language-${codeLang}">${escapeHtml(codeBuffer.join('\n'))}</code></pre>
-            </div>\n`;
-          }
-          inCodeBlock = false;
-          codeBuffer = [];
-        } else {
-          flushList();
-          flushTable();
-          inCodeBlock = true;
-          codeLang = line.replace(/^```/, '').trim();
-        }
-        continue;
-      }
-
-      if (inCodeBlock) {
-        codeBuffer.push(line);
-        continue;
-      }
-
-      if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
-        flushList();
-        inTable = true;
-        tableBuffer.push(line.trim());
-        continue;
-      } else if (inTable) {
-        flushTable();
-      }
-
-      if (/^---{1,}$/.test(line.trim())) {
-        flushList();
-        html += '<hr class="shadcn-divider" />\n';
-        continue;
-      }
-
-      const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
-      if (headingMatch) {
-        flushList();
-        blockIndex++;
-        const level = headingMatch[1].length;
-        const text = headingMatch[2];
-        const bId = `${sectionKey}-heading-${blockIndex}`;
-        html += `<div class="spec-block heading-block" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-          <h${level}>${parseInline(text)}</h${level}>
-          <button class="block-comment-trigger" data-action="comment-trigger" data-block-id="${bId}" data-ref="${escapeHtml(text)}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            Замечание
-          </button>
-        </div>\n`;
-        continue;
-      }
-
-      const taskMatch = line.match(/^(\s*)-\s+\[([ xX])\]\s+(.*)$/);
-      if (taskMatch) {
-        if (listType !== 'tasks') {
-          flushList();
-          html += '<div class="tasks-group">\n';
-          listType = 'tasks';
-        }
-        blockIndex++;
-        const isChecked = taskMatch[2].toLowerCase() === 'x';
-        const text = taskMatch[3];
-        const bId = `${sectionKey}-task-${blockIndex}`;
-        html += `<div class="spec-block task-card ${isChecked ? 'completed' : ''}" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-          <div class="task-left">
-            <div class="shadcn-checkbox ${isChecked ? 'checked' : ''}">
-              ${isChecked ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
-            </div>
-            <span class="task-text">${parseInline(text)}</span>
-          </div>
-          <button class="block-comment-trigger" data-action="comment-trigger" data-block-id="${bId}" data-ref="Задача: ${escapeHtml(text)}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            Замечание
-          </button>
-        </div>\n`;
-        continue;
-      }
-
-      const listMatch = line.match(/^(\s*)-\s+(.*)$/);
-      if (listMatch) {
-        if (listType !== 'standard') {
-          flushList();
-          html += '<ul class="shadcn-list">\n';
-          listType = 'standard';
-        }
-        blockIndex++;
-        const text = listMatch[2];
-        const bId = `${sectionKey}-li-${blockIndex}`;
-        html += `<li class="spec-block list-item-block" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-          <span>${parseInline(text)}</span>
-          <button class="block-comment-trigger" data-action="comment-trigger" data-block-id="${bId}" data-ref="${escapeHtml(text)}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            Замечание
-          </button>
-        </li>\n`;
-        continue;
-      }
-
-      if (line.trim().length > 0) {
-        flushList();
-        blockIndex++;
-        const bId = `${sectionKey}-p-${blockIndex}`;
-        html += `<div class="spec-block paragraph-block" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-          <p>${parseInline(line)}</p>
-          <button class="block-comment-trigger" data-action="comment-trigger" data-block-id="${bId}" data-ref="${escapeHtml(line.trim().substring(0, 60)) + '...'}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            Замечание
-          </button>
-        </div>\n`;
-        continue;
-      }
-    }
-
-    flushQuote();
-    flushList();
-    flushTable();
-    return html;
-  }
-
-  function parseInline(text) {
-    if (!text) return '';
-    let res = escapeHtml(text);
-    res = res.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    res = res.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    res = res.replace(/`([^`]+)`/g, '<code class="shadcn-code">$1</code>');
-    res = res.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="shadcn-link" target="_blank" rel="noopener noreferrer">$1</a>');
-    return res;
-  }
-
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  const parsedExplore = parseMarkdown(exploreMd, 'explore', 'Explore (SSOT)');
-  const parsedProposal = parseMarkdown(proposalMd, 'proposal', 'Proposal');
-  const parsedDesign = parseMarkdown(designMd, 'design', 'Design');
-  const parsedTasks = parseMarkdown(tasksMd, 'tasks', 'Tasks');
-
-  let parsedDiscoveryContent = '';
-  if (discoveryFiles.length > 0) {
-    parsedDiscoveryContent = discoveryFiles.map((df, idx) => {
-      const parsedFile = parseMarkdown(df.content, `disc-${idx}`, `Discovery: ${df.title}`);
-      return `<div class="discovery-section-card" style="margin-bottom: 2rem;">
-        <div class="discovery-section-header">
-          <span class="discovery-section-badge">🤖 Сабагент / ${escapeHtml(df.name)}</span>
-          <h2 style="margin: 0.35rem 0 0.75rem; border-bottom: none; font-size: 1.15rem;">${escapeHtml(df.title)}</h2>
-        </div>
-        <div class="discovery-section-body">
-          ${parsedFile}
-        </div>
-      </div>`;
-    }).join('\n<hr class="shadcn-divider" />\n');
-  } else {
-    parsedDiscoveryContent = `
-      <div class="discovery-empty-state">
-        <div class="empty-icon">🤖</div>
-        <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Сабагентные отчёты не найдены</h3>
-        <p style="color: var(--muted-foreground); max-width: 500px; margin: 0 auto 1.25rem;">
-          При глубоком исследовании кодовой базы сабагенты сохраняют специализированные брифы в папку <code>openspec/changes/${escapeHtml(changeId)}/discovery/*.md</code>.
-        </p>
-        <div class="code-card" style="text-align: left; max-width: 550px; margin: 0 auto;">
-          <div class="code-card-header"><span class="code-lang-badge">Структура discovery/</span></div>
-          <pre><code>openspec/changes/${escapeHtml(changeId)}/
-├── explore.md                # Сводный SSOT
-└── discovery/                # Брифы сабагентов
-    ├── 01-architecture.md    # Карта модулей
-    ├── 02-data-contracts.md  # Аудит схемы БД и API
-    └── 03-blast-radius.md    # Оценка рисков</code></pre>
-        </div>
-      </div>
-    `;
-  }
-
-  const fullHtml = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenSpec — ${changeId}</title>
+  <title>OpenSpec — ${escapeHtml(changeId)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -448,104 +69,79 @@ function generateSpecViewer(targetDirectory) {
       top: 0;
       z-index: 50;
       background: rgba(9, 9, 11, 0.95);
-      border-bottom: 1px solid var(--border);
       backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
       padding: 0.75rem 2rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      box-sizing: border-box;
     }
 
     .header-left { display: flex; align-items: center; gap: 1rem; }
-    .brand-logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; font-size: 0.95rem; color: var(--foreground); text-decoration: none; }
-    .logo-icon { width: 22px; height: 22px; background: var(--foreground); color: var(--background); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
-    .badge-change { display: inline-flex; align-items: center; background: #18181b; border: 1px solid var(--border); color: var(--muted-foreground); padding: 0.2rem 0.65rem; border-radius: 9999px; font-family: 'Geist Mono', monospace; font-size: 0.75rem; font-weight: 500; letter-spacing: -0.2px; }
+    .brand-logo { font-size: 1.1rem; font-weight: 700; color: var(--foreground); display: flex; align-items: center; gap: 0.5rem; text-decoration: none; }
+    .logo-icon { width: 22px; height: 22px; background: #fafafa; color: #09090b; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 900; }
+    .badge-change { background: var(--secondary); color: var(--secondary-foreground); font-size: 0.75rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 9999px; border: 1px solid var(--border); font-family: 'Geist Mono', monospace; }
 
-    .header-right { display: flex; align-items: center; gap: 1rem; }
-    .badge-progress-container {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      background: #18181b;
-      border: 1px solid var(--border);
-      padding: 0.35rem 0.75rem;
-      border-radius: 6px;
-      min-width: 140px;
-    }
-    .badge-progress-text { font-size: 0.725rem; font-weight: 500; color: var(--muted-foreground); font-family: 'Geist Mono', monospace; display: flex; justify-content: space-between; }
-    .badge-progress-track { width: 100%; height: 4px; background: #27272a; border-radius: 9999px; overflow: hidden; }
+    .header-right { display: flex; align-items: center; gap: 1.25rem; }
+    .badge-progress-container { display: flex; flex-direction: column; gap: 0.25rem; width: 140px; }
+    .badge-progress-text { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted-foreground); font-weight: 500; }
+    .badge-progress-track { width: 100%; height: 6px; background: var(--secondary); border-radius: 9999px; overflow: hidden; }
     .badge-progress-fill { height: 100%; background: #10b981; border-radius: 9999px; transition: width 0.3s ease; }
 
     .btn {
-      appearance: none;
-      -webkit-appearance: none;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.45rem;
-      padding: 0.45rem 0.9rem;
-      border-radius: calc(var(--radius) - 2px);
-      font-size: 0.825rem;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
       font-weight: 500;
+      padding: 0.45rem 0.9rem;
       cursor: pointer;
-      border: 1px solid var(--border);
-      background: var(--background);
-      color: var(--foreground);
       transition: all 0.15s ease;
-      font-family: inherit;
+      border: 1px solid transparent;
       text-decoration: none;
-      white-space: nowrap;
-      outline: none;
+      font-family: inherit;
     }
-    .btn:hover { background: var(--secondary); color: var(--foreground); }
-    .btn-primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); font-weight: 600; }
-    .btn-primary:hover { background: #e4e4e7; border-color: #e4e4e7; color: var(--primary-foreground); }
-    .btn-outline { background: transparent; border-color: var(--border); color: var(--muted-foreground); }
-    .btn-outline:hover { background: var(--secondary); color: var(--foreground); border-color: #3f3f46; }
-    .btn-ghost { background: transparent; border-color: transparent; color: var(--muted-foreground); padding: 0.35rem 0.65rem; }
+    .btn-outline { background: transparent; border-color: var(--border); color: var(--foreground); }
+    .btn-outline:hover { background: var(--secondary); }
+    .btn-ghost { background: transparent; color: var(--muted-foreground); padding: 0.35rem 0.65rem; }
     .btn-ghost:hover { background: var(--secondary); color: var(--foreground); }
-    .btn-danger { color: #f87171; border-color: transparent; background: transparent; }
-    .btn-danger:hover { background: rgba(127, 29, 29, 0.2); color: #fca5a5; }
-
-    .badge-count {
-      background: #27272a;
-      color: #fafafa;
-      font-size: 0.7rem;
-      padding: 0.05rem 0.45rem;
-      border-radius: 9999px;
-      font-family: 'Geist Mono', monospace;
-      margin-left: 0.3rem;
-      border: 1px solid #3f3f46;
-    }
+    .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
 
     .main-container {
-      width: 100%;
-      padding: 1.5rem 2rem;
       display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      gap: 2rem;
-      align-items: flex-start;
-      box-sizing: border-box;
       flex: 1;
+      width: 100%;
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+      gap: 1.75rem;
+      align-items: flex-start;
     }
 
     .content-column {
-      flex: 1 1 auto;
+      flex: 1;
       min-width: 0;
-      max-width: calc(100% - 470px);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
     }
 
     .tabs-nav-wrapper {
-      display: inline-flex;
-      background: #18181b;
-      padding: 4px;
-      border-radius: 8px;
-      border: 1px solid #27272a;
-      margin-bottom: 1.5rem;
-      gap: 4px;
-      flex-wrap: wrap;
+      display: flex;
+      align-items: center;
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.3rem;
+      gap: 0.25rem;
+      position: sticky;
+      top: 65px;
+      z-index: 30;
+      backdrop-filter: blur(8px);
     }
 
     .tab-trigger {
@@ -553,11 +149,10 @@ function generateSpecViewer(targetDirectory) {
       -webkit-appearance: none;
       background: transparent;
       border: 1px solid transparent;
-      outline: none;
-      padding: 6px 14px;
+      color: var(--muted-foreground);
+      padding: 0.45rem 0.9rem;
       font-size: 0.85rem;
       font-weight: 500;
-      color: #a1a1aa;
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.15s ease;
@@ -748,16 +343,15 @@ function generateSpecViewer(targetDirectory) {
     .diagram-modal-toolbar { display: flex; align-items: center; gap: 0.5rem; }
     .diagram-modal-viewport {
       flex: 1;
-      width: 100%;
-      height: 100%;
       overflow: hidden;
       position: relative;
-      background: radial-gradient(circle, #1e1e24 1.2px, #09090b 1.2px);
-      background-size: 28px 28px;
-      cursor: grab;
+      background: radial-gradient(circle, #18181b 1px, #09090b 1px);
+      background-size: 24px 24px;
       display: flex;
       justify-content: center;
       align-items: center;
+      cursor: grab;
+      user-select: none;
     }
     .diagram-modal-viewport:active { cursor: grabbing; }
     .diagram-modal-canvas {
@@ -769,16 +363,6 @@ function generateSpecViewer(targetDirectory) {
       padding: 2rem;
     }
     .diagram-modal-canvas svg { max-width: none !important; height: auto !important; }
-    .diagram-modal-footer {
-      background: #121215;
-      border-top: 1px solid var(--border);
-      padding: 0.5rem 1.25rem;
-      font-size: 0.75rem;
-      color: var(--muted-foreground);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
 
     .tasks-group { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.85rem 0; }
     .task-card { display: flex; align-items: center; justify-content: space-between; background: #121215; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); padding: 0.65rem 0.85rem; transition: border-color 0.15s ease; }
@@ -793,10 +377,10 @@ function generateSpecViewer(targetDirectory) {
     .shadcn-list { margin-left: 1.25rem; margin-bottom: 0.75rem; color: #d4d4d8; font-size: 0.9rem; }
     .list-item-block { margin: 0.35rem 0; }
 
-    .table-wrapper { overflow-x: auto; margin: 1.25rem 0; border: 1px solid var(--border); border-radius: var(--radius); }
-    .shadcn-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
-    .shadcn-table th { background: #121215; color: var(--muted-foreground); font-weight: 500; padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border); }
-    .shadcn-table td { padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border-subtle); color: #d4d4d8; }
+    .table-wrapper { width: 100%; overflow-x: auto; margin: 1.25rem 0; border: 1px solid var(--border); border-radius: var(--radius); }
+    .shadcn-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; }
+    .shadcn-table th { background: #121215; color: var(--muted-foreground); font-weight: 500; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    .shadcn-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-subtle); color: #e4e4e7; }
     .shadcn-table tr:last-child td { border-bottom: none; }
 
     .alert { display: flex; align-items: flex-start; justify-content: space-between; padding: 0.75rem 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: #0d0d10; margin: 1rem 0; gap: 1rem; }
@@ -916,19 +500,19 @@ function generateSpecViewer(targetDirectory) {
 
       <div class="spec-card">
         <div id="tab-explore" class="tab-panel active">
-          ${parsedExplore}
+          ${renderedTabs.explore}
         </div>
         <div id="tab-discovery" class="tab-panel">
-          ${parsedDiscoveryContent}
+          ${renderedTabs.discovery}
         </div>
         <div id="tab-design" class="tab-panel">
-          ${parsedDesign}
+          ${renderedTabs.design}
         </div>
         <div id="tab-proposal" class="tab-panel">
-          ${parsedProposal}
+          ${renderedTabs.proposal}
         </div>
         <div id="tab-tasks" class="tab-panel">
-          ${parsedTasks}
+          ${renderedTabs.tasks}
         </div>
       </div>
     </div>
@@ -948,20 +532,31 @@ function generateSpecViewer(targetDirectory) {
         <button class="filter-pill" onclick="setCommentFilter('all', this)">Все</button>
       </div>
 
-      <div id="comments-list" class="sidebar-scroll-content"></div>
+      <div class="sidebar-scroll-content" id="comments-list"></div>
 
       <div class="sidebar-footer">
         <div class="sidebar-footer-actions">
-          <button class="btn btn-primary" style="flex: 1;" onclick="exportFeedbackForAi()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            Скопировать для ИИ
-          </button>
-          <button class="btn btn-outline" title="Скачать feedback.md" onclick="downloadFeedbackMarkdown()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          </button>
+          <button class="btn btn-outline" style="flex: 1;" onclick="downloadFeedbackMarkdown()">📥 feedback.md</button>
+          <button class="btn btn-primary" style="flex: 1;" onclick="exportFeedbackForAi()">📋 Экспорт в ИИ</button>
         </div>
       </div>
     </aside>
+  </div>
+
+  <!-- Comment Dialog Modal -->
+  <div id="comment-dialog" class="dialog-backdrop">
+    <div class="dialog-container">
+      <div class="dialog-header">
+        <h3 id="dialog-title-text" class="dialog-title">Оставить замечание</h3>
+        <button class="btn btn-ghost" onclick="closeCommentModal()">✕</button>
+      </div>
+      <div id="modal-ref-preview" style="font-size: 0.8rem; color: var(--muted-foreground); background: #121215; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.75rem; max-height: 60px; overflow: hidden; text-overflow: ellipsis; display: none;"></div>
+      <textarea id="modal-comment-text" class="shadcn-textarea" placeholder="Опишите, что требуется исправить или уточнить..."></textarea>
+      <div class="dialog-footer">
+        <button class="btn btn-outline" onclick="closeCommentModal()">Отмена</button>
+        <button class="btn btn-primary" onclick="saveComment()">Сохранить</button>
+      </div>
+    </div>
   </div>
 
   <!-- Fullscreen Diagram Modal -->
@@ -969,128 +564,61 @@ function generateSpecViewer(targetDirectory) {
     <div class="diagram-modal-container">
       <div class="diagram-modal-header">
         <div class="diagram-modal-title">
-          <span>⛶ Интерактивный просмотр схемы</span>
+          <span>📊 Просмотр диаграммы Mermaid</span>
           <span id="modal-zoom-badge" class="badge-count">100%</span>
         </div>
         <div class="diagram-modal-toolbar">
-          <button class="btn btn-outline diagram-btn" onclick="zoomFullscreenDiagram(1.25)" title="Приблизить">🔍 +</button>
-          <button class="btn btn-outline diagram-btn" onclick="zoomFullscreenDiagram(0.8)" title="Отдалить">🔍 -</button>
-          <button class="btn btn-outline diagram-btn" onclick="resetFullscreenDiagram()" title="Сбросить масштаб (1:1)">1:1</button>
-          <button class="btn btn-primary diagram-btn" onclick="fitFullscreenDiagram()" title="Вписать в экран">Вписать</button>
-          <button class="btn btn-ghost" onclick="closeDiagramFullscreen()" style="padding: 0.2rem 0.6rem; font-size: 1.1rem;" title="Закрыть (Esc)">✕</button>
+          <button class="btn btn-outline" style="font-size: 0.75rem;" onclick="zoomFullscreenDiagram(1.25)">🔍 +</button>
+          <button class="btn btn-outline" style="font-size: 0.75rem;" onclick="zoomFullscreenDiagram(0.8)">🔍 -</button>
+          <button class="btn btn-outline" style="font-size: 0.75rem;" onclick="fitFullscreenDiagram()">⛶ Вписать</button>
+          <button class="btn btn-outline" style="font-size: 0.75rem;" onclick="resetFullscreenDiagram()">1:1</button>
+          <button class="btn btn-ghost" style="font-size: 1rem; margin-left: 0.5rem;" onclick="closeDiagramFullscreen()">✕</button>
         </div>
       </div>
       <div class="diagram-modal-viewport" id="diagram-modal-viewport">
         <div class="diagram-modal-canvas" id="diagram-modal-canvas"></div>
       </div>
-      <div class="diagram-modal-footer">
-        <span>💡 <b>Перетаскивание</b> мышью для перемещения • <b>Колесико мыши</b> для зума • <b>Esc</b> для выхода</span>
-        <button class="btn btn-outline" style="font-size: 0.75rem; padding: 0.2rem 0.6rem;" onclick="closeDiagramFullscreen()">Закрыть</button>
-      </div>
     </div>
   </div>
 
-  <div id="comment-dialog" class="dialog-backdrop">
-    <div class="dialog-container">
-      <div class="dialog-header">
-        <div id="dialog-title-text" class="dialog-title">Оставить замечание</div>
-        <button class="btn btn-ghost" style="padding: 0.2rem 0.5rem;" type="button" onclick="closeCommentModal()">✕</button>
-      </div>
-      <div id="modal-ref-preview" class="comment-quote" style="display:none; margin-bottom: 0.75rem;"></div>
-      <textarea id="modal-comment-text" class="shadcn-textarea" placeholder="Напишите замечание или требование по изменению... (Ctrl+Enter для сохранения)"></textarea>
-      <div class="dialog-footer">
-        <button class="btn btn-outline" type="button" onclick="closeCommentModal()">Отмена</button>
-        <button class="btn btn-primary" type="button" onclick="saveComment()">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="export-dialog" class="dialog-backdrop">
-    <div class="dialog-container" style="max-width: 620px;">
-      <div class="dialog-header">
-        <div class="dialog-title">Скопировать комментарии для ИИ</div>
-        <button class="btn btn-ghost" style="padding: 0.2rem 0.5rem;" type="button" onclick="closeExportModal()">✕</button>
-      </div>
-      <p style="font-size: 0.825rem; color: var(--muted-foreground); margin-bottom: 0.75rem;">
-        Скопируйте этот текст и отправьте в чат ассистенту для внесения изменений:
-      </p>
-      <textarea id="export-textarea" class="shadcn-textarea" style="height: 200px; font-family: 'Geist Mono', monospace; font-size: 0.8rem;" readonly></textarea>
-      <div class="dialog-footer">
-        <button class="btn btn-outline" type="button" onclick="closeExportModal()">Закрыть</button>
-        <button class="btn btn-primary" type="button" onclick="copyExportTextarea()">Скопировать в буфер</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="toast" class="shadcn-toast">✓ Скопировано в буфер обмена</div>
+  <div id="toast" class="shadcn-toast"></div>
 
   <script>
-    const STORAGE_KEY = 'openspec_comments_${changeId}';
+    const STORAGE_KEY = 'openspec_comments_${escapeHtml(changeId)}';
     let currentBlockId = null;
     let currentRefSnippet = null;
-    let currentTabId = 'tab-explore';
-    let currentTabName = 'Explore (SSOT)';
+    let currentTabId = null;
+    let currentTabName = null;
     let editingCommentId = null;
     let currentFilter = 'open';
 
-    // Interactive Diagram State Map
     const diagramStates = {};
-    const fullscreenState = {
-      scale: 1,
-      panX: 0,
-      panY: 0,
-      isDragging: false,
-      startX: 0,
-      startY: 0
-    };
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
+    const fullscreenState = { scale: 1, panX: 0, panY: 0, isDragging: false, startX: 0, startY: 0 };
 
     function getComments() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : [];
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       } catch (e) {
         return [];
       }
     }
 
     function saveCommentsToStorage(comments) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(comments));
-      } catch (e) {
-        console.error('Failed to save to localStorage', e);
-      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(comments));
       renderComments();
       updateBlockHighlights();
     }
 
-    // --- Diagram Pan & Zoom Engine ---
     function getDiagramState(blockId) {
       if (!diagramStates[blockId]) {
-        diagramStates[blockId] = {
-          scale: 1,
-          panX: 0,
-          panY: 0,
-          isDragging: false,
-          startX: 0,
-          startY: 0
-        };
+        diagramStates[blockId] = { scale: 1, panX: 0, panY: 0, isDragging: false, startX: 0, startY: 0 };
       }
       return diagramStates[blockId];
     }
 
     function applyDiagramTransform(blockId) {
-      const state = getDiagramState(blockId);
       const canvas = document.getElementById('canvas-' + blockId);
+      const state = getDiagramState(blockId);
       if (canvas) {
         canvas.style.transform = 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + state.scale + ')';
       }
@@ -1140,7 +668,6 @@ function generateSpecViewer(targetDirectory) {
       });
     }
 
-    // --- Fullscreen Diagram Modal Engine ---
     function openDiagramFullscreen(blockId) {
       const canvas = document.getElementById('canvas-' + blockId);
       if (!canvas) return;
@@ -1236,7 +763,6 @@ function generateSpecViewer(targetDirectory) {
       });
     }
 
-    // --- Mermaid Rendering Engine ---
     function renderMermaidInCurrentTab() {
       if (!window.mermaid) return;
       const activePanel = document.querySelector('.tab-panel.active');
@@ -1562,7 +1088,7 @@ function generateSpecViewer(targetDirectory) {
 
       if (targetComments.length === 0) return '';
 
-      let markdown = '### 📋 Замечания к спецификации OpenSpec: ' + '${changeId}' + '\\n\\n';
+      let markdown = '### 📋 Замечания к спецификации OpenSpec: ${escapeHtml(changeId)}\\n\\n';
       markdown += 'Внесите правки ТОЛЬКО в следующие блоки, где были оставлены замечания:\\n\\n';
 
       targetComments.forEach((c, idx) => {
@@ -1574,7 +1100,7 @@ function generateSpecViewer(targetDirectory) {
       markdown += '---\\n';
       markdown += '**Инструкция для ИИ**:\\n';
       markdown += '1. Обновите соответствующие файлы (\`explore.md\`, \`proposal.md\`, \`design.md\`, \`tasks.md\`, \`discovery/\`) только в указанных выше блоках.\\n';
-      markdown += '2. Автоматически пересоберите \`spec-viewer.html\`: \`npx openspec-ex view openspec/changes/' + '${changeId}' + '\`\\n';
+      markdown += '2. Автоматически пересоберите \`spec-viewer.html\`: \`npx openspec-ex view openspec/changes/${escapeHtml(changeId)}\`\\n';
 
       return markdown;
     }
@@ -1587,15 +1113,10 @@ function generateSpecViewer(targetDirectory) {
       }
 
       const markdown = generateExportMarkdown();
-
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(markdown).then(() => {
           showToast('✓ Комментарии скопированы в буфер');
-        }).catch(() => {
-          openExportModal(markdown);
         });
-      } else {
-        openExportModal(markdown);
       }
     }
 
@@ -1615,34 +1136,6 @@ function generateSpecViewer(targetDirectory) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast('✓ Файл feedback.md скачан');
-    }
-
-    function openExportModal(text) {
-      const textarea = document.getElementById('export-textarea');
-      if (textarea) textarea.value = text;
-      const dialog = document.getElementById('export-dialog');
-      if (dialog) {
-        dialog.classList.add('active');
-        dialog.style.display = 'flex';
-      }
-    }
-
-    function closeExportModal() {
-      const dialog = document.getElementById('export-dialog');
-      if (dialog) {
-        dialog.classList.remove('active');
-        dialog.style.display = 'none';
-      }
-    }
-
-    function copyExportTextarea() {
-      const textarea = document.getElementById('export-textarea');
-      if (textarea) {
-        textarea.select();
-        document.execCommand('copy');
-      }
-      closeExportModal();
-      showToast('✓ Комментарии скопированы в буфер');
     }
 
     function showToast(msg) {
@@ -1677,12 +1170,10 @@ function generateSpecViewer(targetDirectory) {
         }
       }
 
-      // Initialize Pan & Zoom on all inline viewports
       document.querySelectorAll('.mermaid-viewport').forEach(vp => {
         setupInlinePanZoom(vp);
       });
 
-      // Initialize Fullscreen Modal Pan & Zoom
       setupFullscreenPanZoom();
 
       document.body.addEventListener('click', (e) => {
@@ -1696,21 +1187,13 @@ function generateSpecViewer(targetDirectory) {
         }
 
         if (e.target.id === 'comment-dialog') closeCommentModal();
-        if (e.target.id === 'export-dialog') closeExportModal();
         if (e.target.id === 'diagram-modal') closeDiagramFullscreen();
       });
 
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           closeCommentModal();
-          closeExportModal();
           closeDiagramFullscreen();
-        }
-        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-          const dialog = document.getElementById('comment-dialog');
-          if (dialog && (dialog.classList.contains('active') || dialog.style.display === 'flex')) {
-            saveComment();
-          }
         }
       });
 
@@ -1721,12 +1204,4 @@ function generateSpecViewer(targetDirectory) {
   </script>
 </body>
 </html>`;
-
-  const outputPath = path.join(resolvedDir, 'spec-viewer.html');
-  fs.writeFileSync(outputPath, fullHtml, 'utf8');
-  return outputPath;
 }
-
-module.exports = {
-  generateSpecViewer
-};

@@ -7,14 +7,14 @@
 const path = require('path');
 let generateSpecViewer;
 try {
-  generateSpecViewer = require('openspec-ex').generateSpecViewer || require('openspec-ex/src/generator.js').generateSpecViewer;
-} catch (e) {
+  generateSpecViewer = require('../dist/index.cjs').generateSpecViewer;
+} catch (e1) {
   try {
-    generateSpecViewer = require('../../src/generator.js').generateSpecViewer;
-  } catch (err) {
+    generateSpecViewer = require('../../dist/index.cjs').generateSpecViewer;
+  } catch (e2) {
     try {
-      generateSpecViewer = require('../src/generator.js').generateSpecViewer;
-    } catch (err2) {
+      generateSpecViewer = require('openspec-ex').generateSpecViewer;
+    } catch (err) {
       console.error('✖ Error: Unable to load OpenSpec-Ex generator module.');
       process.exit(1);
     }

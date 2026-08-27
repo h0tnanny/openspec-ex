@@ -30,12 +30,21 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Run CLI Tests & Help Check
+      - name: Install Dependencies
+        run: npm install
+
+      - name: TypeScript Typecheck
+        run: npm run typecheck
+
+      - name: Run Vitest Suite & Snapshots
         run: npm test
 
-      - name: Test Installer & Dry Run Pack
+      - name: Build Distributable Packages
+        run: npm run build
+
+      - name: Test Compiled CLI & Dry Run Pack
         run: |
-          node bin/cli.js init --agent antigravity
+          node dist/bin/cli.cjs init --agent antigravity
           npm pack --dry-run
 
   build-package:
@@ -50,6 +59,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
+
+      - name: Install Dependencies & Build
+        run: |
+          npm install
+          npm run build
 
       - name: Pack NPM Tarball
         id: pack
@@ -81,9 +95,14 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@h0tnanny'
 
+      - name: Install Dependencies & Build
+        run: |
+          npm install
+          npm run build
+
       - name: Prepare GitHub Packages Manifest
         run: |
-          node -e "const pkg=require('./package.json'); pkg.name='@h0tnanny/openspec-ex'; pkg.publishConfig={registry:'https://npm.pkg.github.com'}; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));"
+          node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json','utf8')); pkg.name='@h0tnanny/openspec-ex'; pkg.publishConfig={registry:'https://npm.pkg.github.com'}; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2));"
 
       - name: Publish to GitHub Packages
         run: npm publish
@@ -105,6 +124,11 @@ jobs:
           node-version: '20.x'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Install Dependencies & Build
+        run: |
+          npm install
+          npm run build
+
       - name: Publish to NPM
         if: env.NPM_TOKEN != ''
         run: npm publish --access public
@@ -125,6 +149,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
+
+      - name: Install Dependencies & Build
+        run: |
+          npm install
+          npm run build
 
       - name: Pack NPM Tarball
         id: pack
