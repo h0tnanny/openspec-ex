@@ -1,0 +1,37 @@
+{
+  "name": "openspec-ex",
+  "version": "1.0.0",
+  "description": "Enhanced Spec-Driven Development CLI and Interactive Spec Viewer for OpenSpec",
+  "keywords": [
+    "openspec",
+    "specs",
+    "ai",
+    "cli",
+    "spec-driven-development",
+    "cursor",
+    "antigravity",
+    "claude-code",
+    "windsurf"
+  ],
+  "author": "OpenSpec Contributors",
+  "license": "MIT",
+  "main": "src/generator.js",
+  "bin": {
+    "openspec-ex": "./bin/cli.js",
+    "opsx-ex": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "rules",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node bin/cli.js --help",
+    "spec:view": "openspec-ex view"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

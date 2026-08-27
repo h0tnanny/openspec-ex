@@ -1,0 +1,36 @@
+# OpenSpec Workflow Rules (Enhanced Edition)
+
+This project follows **OpenSpec Spec-Driven Development (SDD)** with Single Source of Truth (SSOT) discovery, proactive Q&A interviewing, proposal self-audit verification, and interactive spec review.
+
+## 1. Explore Phase (`explore`)
+When exploring changes, ideas, or problems:
+1. **Verbatim Prompt Capture**: Always capture the user's initial verbatim prompt into context without losing requirements.
+2. **Proactive Interviewing**: Ask 3–5 sharp, targeted questions to clarify boundaries, edge cases, performance constraints, and acceptance criteria.
+3. **Single Source of Truth (`explore.md`)**:
+   - Create `openspec/changes/<change-id>/explore.md` before proceeding.
+   - Record the verbatim prompt, interview Q&A, and core problem/goals.
+   - Status is marked `Frozen`.
+
+## 2. Propose Phase (`propose`)
+When generating proposals:
+1. **SSOT Reliance**: Base all technical decisions strictly on `explore.md`.
+2. **Mandatory Review / Gap Analysis**: Perform an automated verification pass to ensure zero lost intent from `explore.md`.
+3. **Artifact Generation**: Generate `proposal.md`, `specs/`, `design.md`, and `tasks.md`.
+4. **Interactive Spec Viewer**:
+   - Run the viewer generator:
+     ```bash
+     npx openspec-ex view openspec/changes/<change-id>
+     ```
+   - Present `spec-viewer.html` for human-in-the-loop block commenting.
+
+## 3. Feedback Loop & Iterative Edits
+When the user provides comments:
+- Update only the specified blocks across `explore.md`, `proposal.md`, `design.md`, `tasks.md`.
+- Automatically recompile `spec-viewer.html`.
+- Continue until all comments are resolved.
+
+## 4. Apply Phase (`apply`)
+When implementing:
+- Verify that all comments are resolved.
+- Implement tasks from `tasks.md` sequentially.
+- Verify against criteria from `explore.md`.
