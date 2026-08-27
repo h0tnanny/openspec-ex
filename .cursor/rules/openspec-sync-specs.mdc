@@ -1,0 +1,36 @@
+---
+name: openspec-sync-specs
+description: Sync delta specs from a change to main specs. Use when the user wants to update main specs with changes from a delta spec, without archiving the change.
+license: MIT
+compatibility: Requires openspec CLI.
+metadata:
+  author: openspec-ex
+  version: "1.0"
+  generatedBy: "openspec-ex"
+globs: ["openspec/**", "**/*.md"]
+---
+
+Sync delta specs from a change to main specs.
+
+This is an **agent-driven** operation - you will read delta specs and directly edit main specs to apply the changes. This allows intelligent merging (e.g., adding a scenario without copying the entire requirement).
+
+**Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+
+**Steps**
+
+1. **If no change name provided, prompt for selection**
+   Run `openspec list --json` to get available changes and select the target.
+
+2. **Find delta specs**
+   Each delta spec file under `specs/` contains sections like:
+   - `## ADDED Requirements` - New requirements to add
+   - `## MODIFIED Requirements` - Changes to existing requirements
+   - `## REMOVED Requirements` - Requirements to remove
+   - `## RENAMED Requirements` - Requirements to rename
+
+3. **For each delta spec, apply changes to main specs**
+   - Read `openspec/specs/<capability>/spec.md` (or create if new)
+   - Merge ADDED, MODIFIED, REMOVED requirements intelligently.
+
+4. **Show summary**
+   Summarize updated capabilities and requirements.

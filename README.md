@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](https://github.com/h0tnanny/openspec-ex/blob/main/LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg?style=flat-square)](https://www.npmjs.com/package/openspec-ex)
 
-> **Enhanced Spec-Driven Development (SDD) for AI Coding Assistants. Preserves 100% original OpenSpec command syntax (`/opsx:*`) while enriching internal execution with Single Source of Truth (SSOT) discovery, proactive Q&A interviewing, proposal self-audits, and automatic interactive HTML spec viewing.**
+> **Enhanced Spec-Driven Development (SDD) for AI Coding Assistants. Preserves 100% original OpenSpec command syntax (`/opsx:*`) while enriching internal execution with Single Source of Truth (SSOT) discovery, Subagent Research Delegation, Anti-Execution Guardrails, proposal self-audits, and automatic interactive HTML spec viewing with Mermaid.js support.**
 
 ---
 
@@ -36,9 +36,9 @@ No new slash commands are introduced. Your existing workflows continue using the
 
 | Command | Original OpenSpec Role | OpenSpec-Ex Internal Enhancements |
 | :--- | :--- | :--- |
-| **`/opsx:explore`** | Free-form discovery | + Proactive Q&A interview (Grill-Me)<br>+ Verbatim prompt preservation<br>+ Freezes `explore.md` as immutable SSOT |
-| **`/opsx:propose`** | Creates change artifacts | + Strict dependency on `explore.md`<br>+ Automated Gap-Analysis Self-Audit<br>+ Automatic compilation of `spec-viewer.html` |
-| **`/opsx:apply`** | Executes implementation | + Validates all feedback & remarks from `spec-viewer.html` are resolved before code changes |
+| **`/opsx:explore`** | Free-form discovery | + **Subagent Research Protocol**: Delegated codebase mapping & schema audits (`discovery/*.md`)<br>+ **Anti-Execution Guardrail**: Prevents premature code editing during discovery<br>+ Proactive Q&A interview (Grill-Me)<br>+ Verbatim prompt preservation & immutable SSOT freeze |
+| **`/opsx:propose`** | Creates change artifacts | + Strict dependency on `explore.md`<br>+ Automated Gap-Analysis Self-Audit<br>+ Automatic compilation of `spec-viewer.html` with **Discovery Insights** & **Mermaid.js** |
+| **`/opsx:apply`** | Executes implementation | + Validates all feedback & remarks from `spec-viewer.html` are resolved before code changes<br>+ Sequential task execution with real-time progress tracking |
 | **`/opsx:sync`** | Merges delta specs | + Intelligent requirement merging into `openspec/specs/` |
 | **`/opsx:archive`** | Moves change to archive | + Safely commits delivered artifacts with attributable Git pathspecs |
 

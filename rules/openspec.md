@@ -1,14 +1,21 @@
 # OpenSpec Workflow Rules (Enhanced Edition)
 
-This project follows **OpenSpec Spec-Driven Development (SDD)** with Single Source of Truth (SSOT) discovery, proactive Q&A interviewing, proposal self-audit verification, and interactive spec review.
+This project follows **OpenSpec Spec-Driven Development (SDD)** with Single Source of Truth (SSOT) discovery, Subagent Research Delegation, proactive Q&A interviewing, proposal self-audit verification, Anti-Execution Guardrails, and interactive spec review.
 
 ## 1. Explore Phase (`explore`)
 When exploring changes, ideas, or problems:
-1. **Verbatim Prompt Capture**: Always capture the user's initial verbatim prompt into context without losing requirements.
-2. **Proactive Interviewing**: Ask 3–5 sharp, targeted questions to clarify boundaries, edge cases, performance constraints, and acceptance criteria.
-3. **Single Source of Truth (`explore.md`)**:
+1. **Explore Stance & Anti-Execution Guardrail**:
+   - Explore mode is **strictly for thinking, discovery, and freezing requirements**, NEVER for implementing application code.
+   - Do NOT emit generic IDE `implementation_plan.md` planning files or execute code changes during Explore mode.
+   - All thinking and requirements MUST be frozen exclusively into `explore.md`.
+2. **Subagent Delegation Protocol**:
+   - When exploring multi-module architectures or deep codebases, delegate targeted research to subagents (*Codebase Mapper*, *Data & Schema Auditor*, *Blast Radius Analyst*).
+   - Subagents save full briefs to `openspec/changes/<change-id>/discovery/*.md` and return concise ~200-word summaries to keep the coordinator's context clean.
+3. **Verbatim Prompt Capture**: Always capture the user's initial verbatim prompt into context without losing requirements.
+4. **Proactive Interviewing**: Ask 3–5 sharp, targeted questions to clarify boundaries, edge cases, performance constraints, and acceptance criteria.
+5. **Single Source of Truth (`explore.md`)**:
    - Create `openspec/changes/<change-id>/explore.md` before proceeding.
-   - Record the verbatim prompt, interview Q&A, and core problem/goals.
+   - Record the verbatim prompt, interview Q&A, core goals, and links to `discovery/` briefs.
    - Status is marked `Frozen`.
 
 ## 2. Propose Phase (`propose`)
@@ -21,11 +28,11 @@ When generating proposals:
      ```bash
      npx openspec-ex view openspec/changes/<change-id>
      ```
-   - Present `spec-viewer.html` for human-in-the-loop block commenting.
+   - Present `spec-viewer.html` for human-in-the-loop block commenting, Discovery Insights review, and Mermaid diagram visualization.
 
 ## 3. Feedback Loop & Iterative Edits
 When the user provides comments:
-- Update only the specified blocks across `explore.md`, `proposal.md`, `design.md`, `tasks.md`.
+- Update only the specified blocks across `explore.md`, `proposal.md`, `design.md`, `tasks.md`, or `discovery/`.
 - Automatically recompile `spec-viewer.html`.
 - Continue until all comments are resolved.
 

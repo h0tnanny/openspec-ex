@@ -1,6 +1,9 @@
 /**
  * OpenSpec Interactive HTML Spec Viewer Generator Module
  * Generates standalone, zero-dependency shadcn/ui dark interactive HTML report.
+ * Supports SSOT Explore, Subagent Discovery Insights, Design, Proposal, Tasks,
+ * Task Completion Progress, Interactive Mermaid Diagrams with Pan/Zoom & Fullscreen,
+ * and Feedback Export to AI & feedback.md.
  */
 
 const fs = require('fs');
@@ -26,6 +29,34 @@ function generateSpecViewer(targetDirectory) {
   const proposalMd = readFileSafe('proposal.md') || '# Proposal\n*No proposal.md found.*';
   const designMd = readFileSafe('design.md') || '# Design\n*No design.md found.*';
   const tasksMd = readFileSafe('tasks.md') || '# Tasks\n*No tasks.md found.*';
+
+  // Read subagent discovery briefs if available
+  const discoveryDir = path.join(resolvedDir, 'discovery');
+  let discoveryFiles = [];
+  if (fs.existsSync(discoveryDir)) {
+    try {
+      discoveryFiles = fs.readdirSync(discoveryDir)
+        .filter(f => f.endsWith('.md'))
+        .sort()
+        .map(f => ({
+          name: f,
+          title: f.replace(/^\d+[-_]?/, '').replace(/\.md$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          content: fs.readFileSync(path.join(discoveryDir, f), 'utf8')
+        }));
+    } catch (e) {
+      discoveryFiles = [];
+    }
+  }
+
+  // Calculate task completion progress
+  let totalTasks = 0;
+  let completedTasks = 0;
+  const taskMatches = tasksMd.matchAll(/-\s+\[([ xX])\]/g);
+  for (const match of taskMatches) {
+    totalTasks++;
+    if (match[1].toLowerCase() === 'x') completedTasks++;
+  }
+  const taskPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   function parseMarkdown(md, sectionKey, sectionTitle) {
     const lines = md.split('\n');
@@ -135,8 +166,35 @@ function generateSpecViewer(targetDirectory) {
           blockIndex++;
           const bId = `${sectionKey}-block-${blockIndex}`;
           const isTextarea = (!codeLang || codeLang === 'text' || codeLang === 'prompt' || codeLang === 'raw');
+          const isMermaid = (codeLang === 'mermaid');
           
-          if (isTextarea) {
+          if (isMermaid) {
+            html += `<div class="spec-block mermaid-card" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
+              <div class="code-card-header">
+                <div class="mermaid-header-left">
+                  <span class="code-lang-badge">MERMAID DIAGRAM</span>
+                </div>
+                <div class="mermaid-header-actions">
+                  <button class="btn btn-ghost diagram-btn" title="Приблизить" onclick="zoomInlineDiagram('${bId}', 1.25)">🔍 +</button>
+                  <button class="btn btn-ghost diagram-btn" title="Отдалить" onclick="zoomInlineDiagram('${bId}', 0.8)">🔍 -</button>
+                  <button class="btn btn-ghost diagram-btn" title="Сбросить масштаб" onclick="resetInlineDiagram('${bId}')">1:1</button>
+                  <button class="btn btn-ghost diagram-btn btn-fullscreen-trigger" title="Развернуть на весь экран" onclick="openDiagramFullscreen('${bId}')">⛶ На весь экран</button>
+                  <button class="block-comment-trigger-static" data-action="comment-trigger" data-block-id="${bId}" data-ref="Диаграмма Mermaid" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    Замечание
+                  </button>
+                </div>
+              </div>
+              <div class="mermaid-viewport" id="viewport-${bId}" data-block-id="${bId}">
+                <div class="mermaid-canvas" id="canvas-${bId}">
+                  <div class="mermaid" id="mermaid-raw-${bId}">${escapeHtml(codeBuffer.join('\n'))}</div>
+                </div>
+              </div>
+              <div class="mermaid-card-footer">
+                <span>💡 Колесико мыши: масштаб • Перетаскивание: перемещение • Кнопка <b>⛶ На весь экран</b> для максимального обзора</span>
+              </div>
+            </div>\n`;
+          } else if (isTextarea) {
             html += `<div class="spec-block prompt-textarea-card" id="${bId}" data-block-id="${bId}" data-tab-id="tab-${sectionKey}" data-tab-name="${sectionTitle}">
               <div class="textarea-header">
                 <span class="textarea-badge">Исходный запрос / Промпт</span>
@@ -299,6 +357,41 @@ function generateSpecViewer(targetDirectory) {
   const parsedDesign = parseMarkdown(designMd, 'design', 'Design');
   const parsedTasks = parseMarkdown(tasksMd, 'tasks', 'Tasks');
 
+  let parsedDiscoveryContent = '';
+  if (discoveryFiles.length > 0) {
+    parsedDiscoveryContent = discoveryFiles.map((df, idx) => {
+      const parsedFile = parseMarkdown(df.content, `disc-${idx}`, `Discovery: ${df.title}`);
+      return `<div class="discovery-section-card" style="margin-bottom: 2rem;">
+        <div class="discovery-section-header">
+          <span class="discovery-section-badge">🤖 Сабагент / ${escapeHtml(df.name)}</span>
+          <h2 style="margin: 0.35rem 0 0.75rem; border-bottom: none; font-size: 1.15rem;">${escapeHtml(df.title)}</h2>
+        </div>
+        <div class="discovery-section-body">
+          ${parsedFile}
+        </div>
+      </div>`;
+    }).join('\n<hr class="shadcn-divider" />\n');
+  } else {
+    parsedDiscoveryContent = `
+      <div class="discovery-empty-state">
+        <div class="empty-icon">🤖</div>
+        <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Сабагентные отчёты не найдены</h3>
+        <p style="color: var(--muted-foreground); max-width: 500px; margin: 0 auto 1.25rem;">
+          При глубоком исследовании кодовой базы сабагенты сохраняют специализированные брифы в папку <code>openspec/changes/${escapeHtml(changeId)}/discovery/*.md</code>.
+        </p>
+        <div class="code-card" style="text-align: left; max-width: 550px; margin: 0 auto;">
+          <div class="code-card-header"><span class="code-lang-badge">Структура discovery/</span></div>
+          <pre><code>openspec/changes/${escapeHtml(changeId)}/
+├── explore.md                # Сводный SSOT
+└── discovery/                # Брифы сабагентов
+    ├── 01-architecture.md    # Карта модулей
+    ├── 02-data-contracts.md  # Аудит схемы БД и API
+    └── 03-blast-radius.md    # Оценка рисков</code></pre>
+        </div>
+      </div>
+    `;
+  }
+
   const fullHtml = `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -308,6 +401,7 @@ function generateSpecViewer(targetDirectory) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <style>
     :root {
       --background: #09090b;
@@ -367,6 +461,21 @@ function generateSpecViewer(targetDirectory) {
     .brand-logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; font-size: 0.95rem; color: var(--foreground); text-decoration: none; }
     .logo-icon { width: 22px; height: 22px; background: var(--foreground); color: var(--background); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
     .badge-change { display: inline-flex; align-items: center; background: #18181b; border: 1px solid var(--border); color: var(--muted-foreground); padding: 0.2rem 0.65rem; border-radius: 9999px; font-family: 'Geist Mono', monospace; font-size: 0.75rem; font-weight: 500; letter-spacing: -0.2px; }
+
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+    .badge-progress-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      background: #18181b;
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      min-width: 140px;
+    }
+    .badge-progress-text { font-size: 0.725rem; font-weight: 500; color: var(--muted-foreground); font-family: 'Geist Mono', monospace; display: flex; justify-content: space-between; }
+    .badge-progress-track { width: 100%; height: 4px; background: #27272a; border-radius: 9999px; overflow: hidden; }
+    .badge-progress-fill { height: 100%; background: #10b981; border-radius: 9999px; transition: width 0.3s ease; }
 
     .btn {
       appearance: none;
@@ -436,6 +545,7 @@ function generateSpecViewer(targetDirectory) {
       border: 1px solid #27272a;
       margin-bottom: 1.5rem;
       gap: 4px;
+      flex-wrap: wrap;
     }
 
     .tab-trigger {
@@ -515,6 +625,25 @@ function generateSpecViewer(targetDirectory) {
     .spec-block:hover .block-comment-trigger { opacity: 1; }
     .block-comment-trigger:hover { background: var(--secondary); color: var(--foreground); border-color: #3f3f46; }
 
+    .block-comment-trigger-static {
+      appearance: none;
+      -webkit-appearance: none;
+      background: #18181b;
+      border: 1px solid var(--border);
+      color: var(--muted-foreground);
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.25rem 0.6rem;
+      border-radius: 5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .block-comment-trigger-static:hover { background: var(--secondary); color: var(--foreground); border-color: #3f3f46; }
+
     h1, h2, h3, h4 { color: var(--foreground); font-weight: 600; letter-spacing: -0.02em; }
     h1 { font-size: 1.6rem; margin-bottom: 0.75rem; font-weight: 700; letter-spacing: -0.03em; }
     h2 { font-size: 1.2rem; margin: 1.75rem 0 0.85rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--border-subtle); }
@@ -536,6 +665,120 @@ function generateSpecViewer(targetDirectory) {
     .code-card-header { background: #121215; border-bottom: 1px solid var(--border); padding: 0.4rem 0.85rem; display: flex; justify-content: space-between; align-items: center; }
     .code-lang-badge { font-family: 'Geist Mono', monospace; font-size: 0.725rem; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.5px; }
     pre { padding: 1rem; overflow-x: auto; font-family: 'Geist Mono', monospace; font-size: 0.85rem; color: #e4e4e7; line-height: 1.6; }
+
+    /* Interactive Mermaid Card */
+    .mermaid-card { background: #09090b; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 1.25rem 0; }
+    .mermaid-header-left { display: flex; align-items: center; gap: 0.5rem; }
+    .mermaid-header-actions { display: flex; align-items: center; gap: 0.35rem; }
+    .diagram-btn { font-size: 0.75rem; padding: 0.2rem 0.55rem; color: var(--muted-foreground); }
+    .diagram-btn:hover { color: #fafafa; background: #27272a; }
+    .btn-fullscreen-trigger { color: #38bdf8 !important; border: 1px solid rgba(56, 189, 248, 0.2) !important; background: rgba(56, 189, 248, 0.05) !important; }
+    .btn-fullscreen-trigger:hover { background: rgba(56, 189, 248, 0.15) !important; color: #7dd3fc !important; }
+
+    .mermaid-viewport {
+      width: 100%;
+      min-height: 360px;
+      max-height: 520px;
+      overflow: hidden;
+      position: relative;
+      background: radial-gradient(circle, #18181b 1px, #09090b 1px);
+      background-size: 24px 24px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: grab;
+      user-select: none;
+    }
+    .mermaid-viewport:active { cursor: grabbing; }
+    .mermaid-canvas {
+      transform-origin: center center;
+      transition: transform 0.05s ease-out;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1.5rem;
+    }
+    .mermaid-canvas svg { max-width: none !important; height: auto !important; }
+    .mermaid-card-footer {
+      background: #121215;
+      border-top: 1px solid var(--border);
+      padding: 0.4rem 0.85rem;
+      font-size: 0.725rem;
+      color: var(--muted-foreground);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Fullscreen Diagram Modal */
+    .diagram-modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(8px);
+      z-index: 150;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      box-sizing: border-box;
+    }
+    .diagram-modal-backdrop.active { display: flex !important; }
+    .diagram-modal-container {
+      background: #09090b;
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) + 4px);
+      width: 95vw;
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+      animation: dialogScale 0.15s ease-out;
+    }
+    .diagram-modal-header {
+      background: #121215;
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .diagram-modal-title { font-size: 0.95rem; font-weight: 600; color: #fafafa; display: flex; align-items: center; gap: 0.5rem; }
+    .diagram-modal-toolbar { display: flex; align-items: center; gap: 0.5rem; }
+    .diagram-modal-viewport {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+      background: radial-gradient(circle, #1e1e24 1.2px, #09090b 1.2px);
+      background-size: 28px 28px;
+      cursor: grab;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .diagram-modal-viewport:active { cursor: grabbing; }
+    .diagram-modal-canvas {
+      transform-origin: center center;
+      transition: transform 0.05s ease-out;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+    }
+    .diagram-modal-canvas svg { max-width: none !important; height: auto !important; }
+    .diagram-modal-footer {
+      background: #121215;
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1.25rem;
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
     .tasks-group { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.85rem 0; }
     .task-card { display: flex; align-items: center; justify-content: space-between; background: #121215; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); padding: 0.65rem 0.85rem; transition: border-color 0.15s ease; }
@@ -568,6 +811,11 @@ function generateSpecViewer(targetDirectory) {
     .alert-warning { border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.04); }
     .alert-warning .alert-icon { color: #fbbf24; }
     .alert-warning .alert-title { color: #fde68a; }
+
+    .discovery-section-card { background: #0d0d10; border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+    .discovery-section-badge { display: inline-flex; align-items: center; background: #18181b; border: 1px solid var(--border); color: #38bdf8; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-family: 'Geist Mono', monospace; }
+    .discovery-empty-state { text-align: center; padding: 3rem 1.5rem; }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
 
     .sidebar-wrapper {
       width: 440px;
@@ -602,6 +850,7 @@ function generateSpecViewer(targetDirectory) {
     .comment-actions { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem; margin-top: 0.25rem; }
     .comment-actions-left { display: flex; gap: 0.35rem; }
     .sidebar-footer { padding: 0.85rem 1.25rem; border-top: 1px solid var(--border); background: #09090b; }
+    .sidebar-footer-actions { display: flex; gap: 0.5rem; }
 
     .dialog-backdrop { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; }
     .dialog-backdrop.active { display: flex !important; }
@@ -627,6 +876,17 @@ function generateSpecViewer(targetDirectory) {
       </a>
       <span class="badge-change">${escapeHtml(changeId)}</span>
     </div>
+    <div class="header-right">
+      <div class="badge-progress-container" title="Прогресс выполнения задач: ${completedTasks}/${totalTasks}">
+        <div class="badge-progress-text">
+          <span>Задачи:</span>
+          <span>${completedTasks}/${totalTasks} (${taskPercent}%)</span>
+        </div>
+        <div class="badge-progress-track">
+          <div class="badge-progress-fill" style="width: ${taskPercent}%;"></div>
+        </div>
+      </div>
+    </div>
   </header>
 
   <div class="main-container">
@@ -635,6 +895,10 @@ function generateSpecViewer(targetDirectory) {
         <button class="tab-trigger active" data-tab="tab-explore" onclick="switchTab('tab-explore')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           <span>Explore (SSOT)</span>
+        </button>
+        <button class="tab-trigger" data-tab="tab-discovery" onclick="switchTab('tab-discovery')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+          <span>Discovery Insights ${discoveryFiles.length > 0 ? `<span class="badge-count">${discoveryFiles.length}</span>` : ''}</span>
         </button>
         <button class="tab-trigger" data-tab="tab-design" onclick="switchTab('tab-design')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
@@ -653,6 +917,9 @@ function generateSpecViewer(targetDirectory) {
       <div class="spec-card">
         <div id="tab-explore" class="tab-panel active">
           ${parsedExplore}
+        </div>
+        <div id="tab-discovery" class="tab-panel">
+          ${parsedDiscoveryContent}
         </div>
         <div id="tab-design" class="tab-panel">
           ${parsedDesign}
@@ -684,12 +951,43 @@ function generateSpecViewer(targetDirectory) {
       <div id="comments-list" class="sidebar-scroll-content"></div>
 
       <div class="sidebar-footer">
-        <button class="btn btn-primary" style="width: 100%;" onclick="exportFeedbackForAi()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-          Скопировать для ИИ
-        </button>
+        <div class="sidebar-footer-actions">
+          <button class="btn btn-primary" style="flex: 1;" onclick="exportFeedbackForAi()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            Скопировать для ИИ
+          </button>
+          <button class="btn btn-outline" title="Скачать feedback.md" onclick="downloadFeedbackMarkdown()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          </button>
+        </div>
       </div>
     </aside>
+  </div>
+
+  <!-- Fullscreen Diagram Modal -->
+  <div id="diagram-modal" class="diagram-modal-backdrop">
+    <div class="diagram-modal-container">
+      <div class="diagram-modal-header">
+        <div class="diagram-modal-title">
+          <span>⛶ Интерактивный просмотр схемы</span>
+          <span id="modal-zoom-badge" class="badge-count">100%</span>
+        </div>
+        <div class="diagram-modal-toolbar">
+          <button class="btn btn-outline diagram-btn" onclick="zoomFullscreenDiagram(1.25)" title="Приблизить">🔍 +</button>
+          <button class="btn btn-outline diagram-btn" onclick="zoomFullscreenDiagram(0.8)" title="Отдалить">🔍 -</button>
+          <button class="btn btn-outline diagram-btn" onclick="resetFullscreenDiagram()" title="Сбросить масштаб (1:1)">1:1</button>
+          <button class="btn btn-primary diagram-btn" onclick="fitFullscreenDiagram()" title="Вписать в экран">Вписать</button>
+          <button class="btn btn-ghost" onclick="closeDiagramFullscreen()" style="padding: 0.2rem 0.6rem; font-size: 1.1rem;" title="Закрыть (Esc)">✕</button>
+        </div>
+      </div>
+      <div class="diagram-modal-viewport" id="diagram-modal-viewport">
+        <div class="diagram-modal-canvas" id="diagram-modal-canvas"></div>
+      </div>
+      <div class="diagram-modal-footer">
+        <span>💡 <b>Перетаскивание</b> мышью для перемещения • <b>Колесико мыши</b> для зума • <b>Esc</b> для выхода</span>
+        <button class="btn btn-outline" style="font-size: 0.75rem; padding: 0.2rem 0.6rem;" onclick="closeDiagramFullscreen()">Закрыть</button>
+      </div>
+    </div>
   </div>
 
   <div id="comment-dialog" class="dialog-backdrop">
@@ -735,6 +1033,17 @@ function generateSpecViewer(targetDirectory) {
     let editingCommentId = null;
     let currentFilter = 'open';
 
+    // Interactive Diagram State Map
+    const diagramStates = {};
+    const fullscreenState = {
+      scale: 1,
+      panX: 0,
+      panY: 0,
+      isDragging: false,
+      startX: 0,
+      startY: 0
+    };
+
     function escapeHtml(str) {
       if (!str) return '';
       return String(str)
@@ -764,6 +1073,199 @@ function generateSpecViewer(targetDirectory) {
       updateBlockHighlights();
     }
 
+    // --- Diagram Pan & Zoom Engine ---
+    function getDiagramState(blockId) {
+      if (!diagramStates[blockId]) {
+        diagramStates[blockId] = {
+          scale: 1,
+          panX: 0,
+          panY: 0,
+          isDragging: false,
+          startX: 0,
+          startY: 0
+        };
+      }
+      return diagramStates[blockId];
+    }
+
+    function applyDiagramTransform(blockId) {
+      const state = getDiagramState(blockId);
+      const canvas = document.getElementById('canvas-' + blockId);
+      if (canvas) {
+        canvas.style.transform = 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + state.scale + ')';
+      }
+    }
+
+    function zoomInlineDiagram(blockId, factor) {
+      const state = getDiagramState(blockId);
+      state.scale = Math.min(Math.max(state.scale * factor, 0.2), 5);
+      applyDiagramTransform(blockId);
+    }
+
+    function resetInlineDiagram(blockId) {
+      const state = getDiagramState(blockId);
+      state.scale = 1;
+      state.panX = 0;
+      state.panY = 0;
+      applyDiagramTransform(blockId);
+    }
+
+    function setupInlinePanZoom(viewport) {
+      const blockId = viewport.getAttribute('data-block-id');
+      const state = getDiagramState(blockId);
+
+      viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.15 : 0.87;
+        state.scale = Math.min(Math.max(state.scale * factor, 0.2), 5);
+        applyDiagramTransform(blockId);
+      }, { passive: false });
+
+      viewport.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button')) return;
+        state.isDragging = true;
+        state.startX = e.clientX - state.panX;
+        state.startY = e.clientY - state.panY;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!state.isDragging) return;
+        state.panX = e.clientX - state.startX;
+        state.panY = e.clientY - state.startY;
+        applyDiagramTransform(blockId);
+      });
+
+      window.addEventListener('mouseup', () => {
+        state.isDragging = false;
+      });
+    }
+
+    // --- Fullscreen Diagram Modal Engine ---
+    function openDiagramFullscreen(blockId) {
+      const canvas = document.getElementById('canvas-' + blockId);
+      if (!canvas) return;
+
+      const modal = document.getElementById('diagram-modal');
+      const modalCanvas = document.getElementById('diagram-modal-canvas');
+      if (!modal || !modalCanvas) return;
+
+      modalCanvas.innerHTML = canvas.innerHTML;
+      fullscreenState.scale = 1;
+      fullscreenState.panX = 0;
+      fullscreenState.panY = 0;
+      updateFullscreenTransform();
+
+      modal.classList.add('active');
+      modal.style.display = 'flex';
+      setTimeout(fitFullscreenDiagram, 50);
+    }
+
+    function closeDiagramFullscreen() {
+      const modal = document.getElementById('diagram-modal');
+      if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+      }
+    }
+
+    function updateFullscreenTransform() {
+      const canvas = document.getElementById('diagram-modal-canvas');
+      const badge = document.getElementById('modal-zoom-badge');
+      if (canvas) {
+        canvas.style.transform = 'translate(' + fullscreenState.panX + 'px, ' + fullscreenState.panY + 'px) scale(' + fullscreenState.scale + ')';
+      }
+      if (badge) {
+        badge.innerText = Math.round(fullscreenState.scale * 100) + '%';
+      }
+    }
+
+    function zoomFullscreenDiagram(factor) {
+      fullscreenState.scale = Math.min(Math.max(fullscreenState.scale * factor, 0.15), 6);
+      updateFullscreenTransform();
+    }
+
+    function resetFullscreenDiagram() {
+      fullscreenState.scale = 1;
+      fullscreenState.panX = 0;
+      fullscreenState.panY = 0;
+      updateFullscreenTransform();
+    }
+
+    function fitFullscreenDiagram() {
+      const viewport = document.getElementById('diagram-modal-viewport');
+      const canvas = document.getElementById('diagram-modal-canvas');
+      const svg = canvas ? canvas.querySelector('svg') : null;
+      if (!viewport || !svg) return;
+
+      const vRect = viewport.getBoundingClientRect();
+      const sRect = svg.getBoundingClientRect();
+      const scaleX = (vRect.width - 60) / (svg.clientWidth || sRect.width || 800);
+      const scaleY = (vRect.height - 60) / (svg.clientHeight || sRect.height || 600);
+      fullscreenState.scale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.3), 2.5);
+      fullscreenState.panX = 0;
+      fullscreenState.panY = 0;
+      updateFullscreenTransform();
+    }
+
+    function setupFullscreenPanZoom() {
+      const viewport = document.getElementById('diagram-modal-viewport');
+      if (!viewport) return;
+
+      viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.15 : 0.87;
+        zoomFullscreenDiagram(factor);
+      }, { passive: false });
+
+      viewport.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button')) return;
+        fullscreenState.isDragging = true;
+        fullscreenState.startX = e.clientX - fullscreenState.panX;
+        fullscreenState.startY = e.clientY - fullscreenState.panY;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!fullscreenState.isDragging) return;
+        fullscreenState.panX = e.clientX - fullscreenState.startX;
+        fullscreenState.panY = e.clientY - fullscreenState.startY;
+        updateFullscreenTransform();
+      });
+
+      window.addEventListener('mouseup', () => {
+        fullscreenState.isDragging = false;
+      });
+    }
+
+    // --- Mermaid Rendering Engine ---
+    function renderMermaidInCurrentTab() {
+      if (!window.mermaid) return;
+      const activePanel = document.querySelector('.tab-panel.active');
+      if (!activePanel) return;
+
+      const mermaidNodes = activePanel.querySelectorAll('.mermaid:not([data-processed="true"])');
+      if (mermaidNodes.length === 0) return;
+
+      mermaidNodes.forEach((node, idx) => {
+        const rawCode = node.textContent.trim();
+        const uniqueId = 'mermaid-svg-' + Date.now() + '-' + idx;
+        try {
+          mermaid.render(uniqueId, rawCode).then(({ svg }) => {
+            node.innerHTML = svg;
+            node.setAttribute('data-processed', 'true');
+          }).catch(err => {
+            console.warn('Mermaid rendering warning:', err);
+            node.setAttribute('data-processed', 'true');
+            const strayErr = document.getElementById('d' + uniqueId);
+            if (strayErr) strayErr.remove();
+            node.innerHTML = '<div style="color:#f87171; font-size:0.75rem; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); padding:0.6rem; border-radius:6px; margin-bottom:0.65rem;">⚠️ Ошибка парсинга схемы Mermaid. Исходный код:</div><pre style="margin:0;"><code class="language-mermaid">' + escapeHtml(rawCode) + '</code></pre>';
+          });
+        } catch (e) {
+          node.setAttribute('data-processed', 'true');
+          node.innerHTML = '<pre style="margin:0;"><code class="language-mermaid">' + escapeHtml(rawCode) + '</code></pre>';
+        }
+      });
+    }
+
     function switchTab(tabId) {
       document.querySelectorAll('.tab-trigger').forEach(tab => tab.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(content => content.classList.remove('active'));
@@ -772,7 +1274,10 @@ function generateSpecViewer(targetDirectory) {
       if (activeBtn) activeBtn.classList.add('active');
 
       const targetContent = document.getElementById(tabId);
-      if (targetContent) targetContent.classList.add('active');
+      if (targetContent) {
+        targetContent.classList.add('active');
+        setTimeout(renderMermaidInCurrentTab, 30);
+      }
     }
 
     function setCommentFilter(filter, btn) {
@@ -1068,7 +1573,7 @@ function generateSpecViewer(targetDirectory) {
 
       markdown += '---\\n';
       markdown += '**Инструкция для ИИ**:\\n';
-      markdown += '1. Обновите соответствующие файлы (\`explore.md\`, \`proposal.md\`, \`design.md\`, \`tasks.md\`) только в указанных выше блоках.\\n';
+      markdown += '1. Обновите соответствующие файлы (\`explore.md\`, \`proposal.md\`, \`design.md\`, \`tasks.md\`, \`discovery/\`) только в указанных выше блоках.\\n';
       markdown += '2. Автоматически пересоберите \`spec-viewer.html\`: \`npx openspec-ex view openspec/changes/' + '${changeId}' + '\`\\n';
 
       return markdown;
@@ -1092,6 +1597,24 @@ function generateSpecViewer(targetDirectory) {
       } else {
         openExportModal(markdown);
       }
+    }
+
+    function downloadFeedbackMarkdown() {
+      const markdown = generateExportMarkdown();
+      if (!markdown) {
+        alert('Нет замечаний для экспорта. Добавьте замечания перед сохранением.');
+        return;
+      }
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'feedback.md';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('✓ Файл feedback.md скачан');
     }
 
     function openExportModal(text) {
@@ -1131,6 +1654,37 @@ function generateSpecViewer(targetDirectory) {
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      if (window.mermaid) {
+        try {
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            securityLevel: 'loose',
+            darkMode: true,
+            themeVariables: {
+              darkMode: true,
+              background: '#09090b',
+              primaryColor: '#18181b',
+              primaryTextColor: '#fafafa',
+              primaryBorderColor: '#3f3f46',
+              lineColor: '#a1a1aa',
+              secondaryColor: '#121215',
+              tertiaryColor: '#27272a'
+            }
+          });
+        } catch (e) {
+          console.warn('Mermaid init error:', e);
+        }
+      }
+
+      // Initialize Pan & Zoom on all inline viewports
+      document.querySelectorAll('.mermaid-viewport').forEach(vp => {
+        setupInlinePanZoom(vp);
+      });
+
+      // Initialize Fullscreen Modal Pan & Zoom
+      setupFullscreenPanZoom();
+
       document.body.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-action="comment-trigger"]');
         if (trigger) {
@@ -1143,12 +1697,14 @@ function generateSpecViewer(targetDirectory) {
 
         if (e.target.id === 'comment-dialog') closeCommentModal();
         if (e.target.id === 'export-dialog') closeExportModal();
+        if (e.target.id === 'diagram-modal') closeDiagramFullscreen();
       });
 
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           closeCommentModal();
           closeExportModal();
+          closeDiagramFullscreen();
         }
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
           const dialog = document.getElementById('comment-dialog');
@@ -1160,6 +1716,7 @@ function generateSpecViewer(targetDirectory) {
 
       renderComments();
       updateBlockHighlights();
+      renderMermaidInCurrentTab();
     });
   </script>
 </body>

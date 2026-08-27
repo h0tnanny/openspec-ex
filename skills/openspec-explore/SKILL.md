@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires openspec CLI.
 metadata:
   author: openspec-ex
-  version: "1.0"
+  version: "1.1.0"
   generatedBy: "openspec-ex"
 ---
 
@@ -25,6 +25,7 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 - **Adaptive** - Follow interesting threads, pivot when new information emerges
 - **Patient** - Don't rush to conclusions, let the shape of the problem emerge
 - **Grounded** - Explore the actual codebase when relevant, don't just theorize
+- **Context-Efficient** - Delegate deep investigation to subagents to preserve primary context tokens
 
 ---
 
@@ -45,11 +46,9 @@ Depending on what the user brings, you might:
   - Constraints (tech stack, zero new dependencies, backwards compatibility)
   - Edge cases and error handling
 
-**Investigate the codebase**
-- Map existing architecture relevant to the discussion
-- Find integration points
-- Identify patterns already in use
-- Surface hidden complexity
+**Investigate the codebase with Subagent Delegation**
+- When exploring multi-module architectures or deep codebases, spawn subagents to avoid bloating the root context window.
+- Store granular findings in `openspec/changes/<change-name>/discovery/*.md`.
 
 **Compare options**
 - Brainstorm multiple approaches
@@ -86,6 +85,50 @@ Depending on what the user brings, you might:
 
 ---
 
+## 🤖 Subagent Research Protocol (Context-Preservation)
+
+When analyzing codebases with multiple modules, deep dependencies, or unknown architecture, **do not read dozens of files into the primary agent context window**. Instead, automatically delegate targeted exploration tasks to subagents.
+
+```
+                  PRIMARY AGENT-COORDINATOR (Clean Context)
+                                     |
+           +-------------------------+-------------------------+
+           |                         |                         |
+           v                         v                         v
+  [Codebase Mapper]        [Data & Schema Auditor]    [Blast Radius Analyst]
+  Analyzes architecture    Inspects DB models & APIs  Assesses impact & risks
+           |                         |                         |
+           +-------------------------+-------------------------+
+                                     |
+                                     v
+                  Write to openspec/changes/<name>/discovery/*.md
+                  + Return compact 200-word summaries to Coordinator
+```
+
+### Core Subagent Archetypes
+
+1. 🏛 **Codebase & Architecture Mapper**:
+   - Maps module structure, dependency trees, config schemas, and entry points.
+   - Saves findings to `discovery/01-architecture.md`.
+
+2. 🗄 **Data & Contract Auditor**:
+   - Inspects database models, migrations, API contracts, serialization types.
+   - Saves findings to `discovery/02-data-contracts.md`.
+
+3. 🧪 **Test & Verification Inspector**:
+   - Analyzes test runner setup, coverage, fixtures, end-to-end harnesses.
+   - Saves findings to `discovery/03-test-setup.md`.
+
+4. 💥 **Blast Radius & Risk Analyst**:
+   - Traces dependent files, breaking changes, backward-compatibility constraints.
+   - Saves findings to `discovery/04-blast-radius.md`.
+
+### Subagent Prompting Guidelines
+- Instruct subagent: *"Read relevant files in domain X, write detailed findings to `openspec/changes/<change-name>/discovery/<file>.md`, and return a concise summary (max 200 words) with key integration points and risks."*
+- Coordinator reads only the summaries and links `discovery/` in `explore.md`.
+
+---
+
 ## OpenSpec Awareness & Single Source of Truth (SSOT)
 
 You have full context of the OpenSpec system. Use it naturally, don't force it.
@@ -115,6 +158,7 @@ When insights crystallize or the user is ready to formalize the change:
      - **Executive Summary & Goals**
      - **Clarification Interview (Q&A)**
      - **Identified Constraints & Risks**
+     - **Discovery Artifacts & Subagent Briefs** (links to `discovery/*.md`)
    - Mark status as `Frozen`. This serves as the uncompressed Single Source of Truth for proposal authoring.
 
 3. **Offer Next Steps**:
@@ -164,7 +208,7 @@ There's no required ending. Discovery might:
 
 - **Flow into a proposal**: "Ready to start? I can create a change proposal."
 - **Result in artifact updates**: "Updated design.md with these decisions"
-- **Freeze SSOT**: "Captured everything in explore.md"
+- **Freeze SSOT**: "Captured everything in explore.md with subagent discovery briefs in discovery/"
 - **Just provide clarity**: User has what they need, moves on
 
 ---
@@ -172,10 +216,12 @@ There's no required ending. Discovery might:
 ## Guardrails
 
 - **Don't implement** - Never write code or implement features. Creating OpenSpec artifacts is fine, writing application code is not.
+- **Don't leak into execution (Anti-Execution Guardrail)** - In Explore mode, NEVER emit generic IDE implementation plans (such as implementation_plan.md) and NEVER modify codebase source files, even if an automated IDE stop hook or system approval message is received. Remind the user to run `/opsx:propose` and `/opsx:apply` to transition to code implementation.
 - **Don't fake understanding** - If something is unclear, dig deeper
 - **Don't rush** - Discovery is thinking time, not task time
 - **Don't force structure** - Let patterns emerge naturally
 - **Don't auto-capture** - Offer to save insights, don't just do it
 - **Do visualize** - A good diagram is worth many paragraphs
+- **Do delegate** - Use subagents for heavy codebase research to preserve context tokens
 - **Do explore the codebase** - Ground discussions in reality
 - **Do question assumptions** - Including the user's and your own

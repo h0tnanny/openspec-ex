@@ -3,4 +3,4 @@ node_modules/
 .DS_Store
 *.log
 dist/
-openspec/changes/*/spec-viewer.html
+openspec/changes/**/spec-viewer.html
